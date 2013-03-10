@@ -9,15 +9,15 @@ from matplotlib.widgets import AxesWidget
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from matplotlib.path import Path
+import polygon_math
 
 
 class Transform(object):
     pass
 
 
-#TODO: add transform tool
-#TODO: allow for more than than two crossings in an intersect
-#TODO: improve handling of add/sub function - better path
+# TODO: finishing a current tool brings out a transform tool for rectangle and square
+#        but it only works on the current tool
 
 
 class Selector(AxesWidget):
@@ -31,10 +31,20 @@ class Selector(AxesWidget):
 
         if lineprops is None:
             lineprops = dict()
-        lineprops.setdefault('linestyle', '--')
+        lineprops.setdefault('linestyle', '-.')
+        lineprops['color'] = 'black'
         self.line = Line2D([], [], **lineprops)
         self.line.set_visible(False)
         self.ax.add_line(self.line)
+
+        self.prev_line = Line2D([], [], **lineprops)
+        self.prev_line.set_visible(False)
+        self.ax.add_line(self.prev_line)
+
+        lineprops['linestyle'] = '-'
+        self.extent_line = Line2D([], [], **lineprops)
+        self.extent_line.set_visible(False)
+        self.ax.add_line(self.extent_line)
 
         self.connect_event('button_press_event', self.onpress)
         self.connect_event('button_release_event', self.onrelease)
@@ -50,26 +60,28 @@ class Selector(AxesWidget):
         self._patch = Rectangle((0, 0), 0, 0)
         self._patch.set_visible(False)
         self.ax.add_patch(self._patch)
+        self.modifiers = None
+
+        self.timer = self.ax.figure.canvas.new_timer(interval=1000)
+        self.timer.add_callback(self.ontimer)
+        self.timer.start()
+        self.timer_count = 0
 
     def onkey(self, event):
         '''Update our modifiers on a key press
         '''
-        if event.key in ['shift', 'alt', ' ', 'control']:
-            if self.tool.active:
-                self.tool.add_modifier(event.key)
-            else:
-                if event.key == 'shift':
-                    self.mode = 'Add'
-                elif event.key == 'alt':
-                    self.mode = 'Subtract'
-                elif event.key == 'control':
-                    self.mode = 'Intersect'
+        if self.tool.active:
+            self.tool.add_modifier(event.key)
+        else:
+            self.modifiers.add(event.key)
 
     def offkey(self, event):
         '''Update our modifiers on a key release
         '''
         if event.key in self.tool.modifiers:
             self.tool.remove_modifier(event.key)
+        elif not self.tool.active and event.key in self.modifiers:
+            self.modifiers.remove(event.key)
 
     def onmove(self, event):
         '''Update our verts on a mouse movement
@@ -93,6 +105,7 @@ class Selector(AxesWidget):
         if self.ignore(event):
             return
         self.tool.onpress(event)
+        self.prev_line.set_visible(True)
         if (isinstance(self.tool, LassoSelection) and
                 (self._patch.get_visible() or event.dblclick)):
             self.tool.verts = self.tool.verts[:-2]
@@ -120,21 +133,51 @@ class Selector(AxesWidget):
         self.line.set_data(zip(*verts))
         self.line.set_visible(True)
 
+        if isinstance(self.tool, EllipticalSelection):
+            self.extent_line.set_visible(True)
+            ext_verts = self.tool.extents.tolist() + [self.tool.extents[0]]
+            self.extent_line.set_data(zip(*ext_verts))
+        self.update_plot()
+
+    def update_plot(self):
         if self.useblit:
             self.canvas.restore_region(self.background)
             self.ax.draw_artist(self.line)
+            self.ax.draw_artist(self.prev_line)
+            self.ax.draw_artist(self.extent_line)
+            self.ax.draw_artist(self._patch)
             self.canvas.blit(self.ax.bbox)
         else:
             self.canvas.draw_idle()
+
+    def ontimer(self):
+        if not self.line.get_visible():
+            return
+        self.line.set_linestyle('--')
+        self.timer_count += 1
+        if self.timer_count % 2:
+            self.line.set_dashes([4, 2, 6, 4])
+        else:
+            self.line.set_dashes([4, 3, 6, 4])
+        self.update_plot()
 
     def finalize(self):
         '''Take the appropriate action based on mode
         '''
         verts = self.tool.verts
-        if self.mode in ['Add', 'Subtract', 'Intersect'] and self.ax.selection:
+        if self.ax.selection and self.modifiers:
+            if 'ctrl+shift' in self.modifiers:
+                mode = 'Intersect'
+            elif 'shift' in self.modifiers:
+                mode = 'Add'
+            elif 'control' in self.modifiers:
+                mode = 'Subtract'
+            else:
+                mode = None
             try:
-                verts = poly_transform(self.ax.selection, self.tool.verts,
-                                        self.mode)
+                verts = polygon_math.combine_polys(self.ax.selection,
+                                                   self.tool.verts,
+                                                   mode)
             except (ValueError, IndexError):
                 pass
         self.onselect(verts)
@@ -143,7 +186,9 @@ class Selector(AxesWidget):
         self.tool.verts = None
         self._patch.set_visible(False)
         self.draw_line(verts)
-        self.mode = 'New'
+        self.prev_line.set_data(zip(*verts))
+        self.prev_line.set_visible(False)
+        self.modifiers = set()
 
     def set_shape(self, shape):
         if shape == 'Rectangle':
@@ -152,8 +197,6 @@ class Selector(AxesWidget):
             self.tool = EllipticalSelection()
         elif shape == 'Lasso':
             self.tool = LassoSelection()
-        elif shape == 'Polygon':
-            self.tool = LassoSelection('Polygon')
 
     def update_background(self, event):
         if self.ignore(event):
@@ -178,38 +221,31 @@ class Selector(AxesWidget):
                 self._patch.set_width(wid)
                 self._patch.set_height(hgt)
                 self._patch.set_visible(True)
-                self.canvas.draw_idle()
+                self.update_plot()
         else:
             self._patch.set_visible(False)
-            self.canvas.draw_idle()
+            self.update_plot()
 
 
 class SelectorTool(object):
 
     def __init__(self):
-        self.origin = []
         self.active = False
         self.verts = []
         self.modifiers = set()
-        self.is_close = False
         self.finished = False
-        self.extents = []
-        self.anchor = None
 
     def onmove(self, event):
         pass
 
+    def finalize(self):
+        self.finished = True
+
     def onrelease(self, event):
-        pass
+        self.finalize()
 
     def onpress(self, event):
-        pass
-
-    def finalize(self):
-        pass
-
-    def show_close(self):
-        pass
+        self.start(event)
 
     def add_modifier(self, modifier):
         self.modifiers.add(modifier)
@@ -219,42 +255,20 @@ class SelectorTool(object):
 
     def start(self, event):
         self.active = True
-        self.origin = (event.xdata, event.ydata)
-        self.origin_pix = (event.x, event.y)
-        self.verts = [self.origin]
+        self.verts = [(event.xdata, event.ydata)]
         self.finished = False
-        self.extents = np.vstack(self.verts * 4)
-        self.anchor = None
 
 
 class LassoSelection(SelectorTool):
 
-    def __init__(self, type_='Lasso'):
+    def __init__(self):
         SelectorTool.__init__(self)
-        self.type_ = type_
-        self.mode = type_
-
-    def get_mode(self):
-        if ((self.type_ == 'Lasso' and 'alt' in self.modifiers) or
-             (self.type_ == 'Polygon' and not 'alt' in self.modifiers)):
-            return 'Polygon'
-        else:
-            return 'Lasso'
-
-    def add_modifier(self, modifier):
-        if modifier == 'alt' and 'alt' in self.modifiers:
-            self.modifiers.remove('alt')
-        else:
-            self.modifiers.add(modifier)
-
-    def remove_modifier(self, modifier):
-        if not modifier == 'alt':
-            self.modifiers.remove(modifier)
+        self.mode = 'lasso'
 
     def onmove(self, event):
-        if not self.active or not self.origin:
+        if not self.active or not len(self.verts):
             return
-        if self.get_mode() == 'Polygon':
+        if self.mode == 'polygon':
             self.verts[-1] = (event.xdata, event.ydata)
         else:
             self.verts.append((event.xdata, event.ydata))
@@ -262,27 +276,33 @@ class LassoSelection(SelectorTool):
     def onrelease(self, event):
         if not self.active:
             return
-        if not self.get_mode() == 'Polygon':
-            self.finalize()
+        self.mode = 'polygon'
 
     def onpress(self, event):
         if not self.verts:
             self.start(event)
-            if self.get_mode() == 'Polygon':
-                self.verts.append((event.xdata, event.ydata))
-        elif self.get_mode() == 'Polygon':
-            self.verts.append((event.xdata, event.ydata))
-        if self.get_mode() == 'Polygon':
-            if self.is_close and len(self.verts) > 2:
-                self.finalize()
+        self.mode = 'lasso'
+        self.verts.append((event.xdata, event.ydata))
 
     def finalize(self):
-        self.verts.append(self.origin)
+        self.verts.append(self.verts[0])
         self.finished = True
-        self.origin = None
 
 
 class RectangleSelection(SelectorTool):
+
+    def __init__(self):
+        SelectorTool.__init__(self)
+        self.anchor = None
+        self.origin = None
+        self.origin_pix = None
+        self.extents = []
+
+    def start(self, event):
+        SelectorTool.start(self, event)
+        self.origin = self.verts[0]
+        self.origin_pix = (event.x, event.y)
+        self.extents = np.vstack(self.verts * 4)
 
     def onmove(self, event):
         if not self.origin or not self.active:
@@ -310,7 +330,7 @@ class RectangleSelection(SelectorTool):
                     dx *= maxd / abs(dx_pix)
                 if abs(dy_pix) < max:
                     dy *= maxd / abs(dy_pix)
-            if 'alt' in self.modifiers:
+            if 'control' in self.modifiers:
                 # from center
                 dx *= 2
                 dy *= 2
@@ -323,17 +343,8 @@ class RectangleSelection(SelectorTool):
                                        center + [-dx, dy]))
         self.set_verts()
 
-    def onrelease(self, event):
-        self.finalize(event)
-
-    def onpress(self, event):
-        self.start(event)
-
-    def finalize(self, event):
-        self.finished = True
-
     def set_verts(self):
-        self.verts = self.extents.tolist()
+        self.verts = self.extents.tolist() + [self.extents[0]]
 
 
 class EllipticalSelection(RectangleSelection):
@@ -350,107 +361,6 @@ class EllipticalSelection(RectangleSelection):
         y = b * np.sin(rad)
         self.verts = np.vstack((x, y)).T + center
         self.verts = self.verts.tolist()
-
-
-def poly_transform(old, new, transform='Add'):
-    '''Add or subtract one polygon from another
-    '''
-    new_inner, new_outer = get_segments(old, new)
-    old_inner, old_outer = get_segments(new, old)
-    # find the crossover points, adjusting for path direction
-    for option in ['', 'new', 'newold', 'new']:
-        if 'new' in option:
-            new_inner = new_inner[::-1]
-            new_outer = new_outer[::-1]
-        if 'old' in option:
-            old_inner = old_inner[::-1]
-            old_outer = old_outer[::-1]
-        try:
-            cross1 = segment_intersect(old_outer[-1], old_inner[0],
-                                      new_outer[-1], new_inner[0])
-            cross2 = segment_intersect(old_inner[-1], old_outer[0],
-                                   new_inner[-1], new_outer[0])
-        except ValueError:
-            pass
-        else:
-            break
-    # construct the new polygon
-    if transform == 'Add':
-        d1 = dist_points(new_outer[-1], cross1)
-        d2 = dist_points(new_outer[-1], cross2)
-        if d1 < d2:
-            new_outer = new_outer[::-1]
-        verts = (old_outer.tolist() + [cross1] + new_outer.tolist() + [cross2])
-    elif transform == 'Subtract':
-        verts = old_outer.tolist() + [cross1] + new_inner.tolist() + [cross2]
-    else:
-        verts = (old_inner.tolist() + [cross2] + new_inner.tolist()[::-1] +
-                [cross1])
-    # make it a closed polygon
-    verts.append(verts[0])
-    return verts
-
-
-def get_segments(path1, path2):
-    '''Break a polygon into the segments inside the second polygon and
-outside of it
-    '''
-    path1 = Path(path1, closed=True)
-    path2 = Path(path2, closed=True)
-    locations = [path1.contains_point(xy) for xy in path2.vertices]
-    crossings = np.nonzero(np.diff(locations))[0]
-    if len(crossings) == 1:
-        crossings = [crossings[0], -1]
-    if len(crossings) != 2:
-        print('Error!, incorrect number of crossings: {0}'
-                .format(len(crossings)))
-        raise ValueError
-    else:
-        verts = path2.vertices
-        inner = verts[crossings[0] + 1: crossings[1] + 1]
-        outer = np.vstack((verts[crossings[1] + 1:], verts[:crossings[0] + 1]))
-        if locations[0]:
-            inner, outer = outer, inner
-        return inner, outer
-
-
-def dist_points(pt1, pt2):
-    '''Return the distance between two points
-    '''
-    x = pt1[0] - pt2[0]
-    y = pt1[1] - pt2[1]
-    return np.hypot(x, y)
-
-
-def perpendicular(a):
-    '''Return the perpendicular segment to a
-    '''
-    b = np.empty_like(a)
-    b[0] = -a[1]
-    b[1] = a[0]
-    return b
-
-
-def segment_intersect(a1, a2, b1, b2):
-    '''Find the intersection between two line segments
-    '''
-    da = a2 - a1
-    db = b2 - b1
-    dp = a1 - b1
-    dap = perpendicular(da)
-    denom = np.dot(dap, db)
-    num = np.dot(dap, dp)
-    if denom == 0:
-        raise ValueError
-    inter = (num / denom) * db + b1
-    max_x = max(a1[0], a2[0], b1[0], b2[0])
-    min_x = min(a1[0], a2[0], b1[0], b2[0])
-    max_y = max(a1[1], a2[1], b1[1], b2[1])
-    min_y = min(a1[1], a2[1], b1[1], b2[1])
-    if (inter[0] < min_x or inter[0] > max_x or inter[1] < min_y or
-            inter[1] > max_y):
-        raise ValueError('Segments to not cross')
-    return inter
 
 
 class SelectFromCollection(object):
@@ -518,7 +428,7 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(subplot_kw=subplot_kw)
 
     pts = ax.scatter(data[:, 0], data[:, 1], s=80)
-    selector = SelectFromCollection(ax, pts, shape='Polygon')
+    selector = SelectFromCollection(ax, pts, shape='Ellipse')
 
     plt.show()
     raw_input('Press any key to accept selected points')

@@ -36,6 +36,8 @@ def combine_polys(poly_old, poly_new, mode='add'):
     '''Add, subtract, or intersect two polygons
     '''
     # TODO: handle overlapping segments better
+    if not mode:
+        raise ValueError
     seg_old = gather_segments(poly_old)
     seg_new = gather_segments(poly_new)
     seg_new_all = break_segments(seg_new, seg_old)
@@ -44,10 +46,10 @@ def combine_polys(poly_old, poly_new, mode='add'):
                 for (pt1, pt2) in seg_new_all]
     in_new = [segment_in_polygon(pt1, pt2, poly_new)[0]
                 for (pt1, pt2) in seg_old_all]
-    if mode == 'sum':
+    if mode == 'Add':
         keep_in_old = False
         keep_in_new = False
-    elif mode == 'diff':
+    elif mode == 'Subtract':
         keep_in_old = True
         keep_in_new = False
     else:
@@ -57,7 +59,7 @@ def combine_polys(poly_old, poly_new, mode='add'):
                     if (is_in_old == keep_in_old)]
     seg_old = [seg for (seg, is_in_new) in zip(seg_old_all, in_new)
                     if (is_in_new == keep_in_new)]
-    return order_segments(seg_new + seg_old)
+    return order_segments(seg_new + seg_old).tolist()
 
 
 def order_segments(segments):
@@ -216,7 +218,7 @@ if __name__ == '__main__':
 
     segment_intersect(np.array([85, 35]), np.array([25, 35]),
                       np.array([70, 70]), np.array([70, 24]))
-    verts = combine_polys(poly1_verts, poly2_verts, 'diff')
+    verts = combine_polys(poly1_verts, poly2_verts, 'Subtract')
     #plt.plot(poly1_verts.T[0], poly1_verts.T[1])
     #plt.plot(poly2_verts.T[0], poly2_verts.T[1])
     plt.plot(verts.T[0], verts.T[1], '--')
