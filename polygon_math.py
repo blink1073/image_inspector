@@ -42,10 +42,8 @@ def combine_polys(poly_old, poly_new, mode='add'):
     seg_new = gather_segments(poly_new)
     seg_new_all = break_segments(seg_new, seg_old)
     seg_old_all = break_segments(seg_old, seg_new)
-    in_old = [segment_in_polygon(pt1, pt2, poly_old)[0]
-                for (pt1, pt2) in seg_new_all]
-    in_new = [segment_in_polygon(pt1, pt2, poly_new)[0]
-                for (pt1, pt2) in seg_old_all]
+    in_old = segments_in_polygon(seg_new_all, poly_old)
+    in_new = segments_in_polygon(seg_old_all, poly_new)
     if mode == 'Add':
         keep_in_old = False
         keep_in_new = False
@@ -59,7 +57,8 @@ def combine_polys(poly_old, poly_new, mode='add'):
                     if (is_in_old == keep_in_old)]
     seg_old = [seg for (seg, is_in_new) in zip(seg_old_all, in_new)
                     if (is_in_new == keep_in_new)]
-    return order_segments(seg_new + seg_old).tolist()
+    seg = order_segments(seg_new + seg_old).tolist()
+    return seg
 
 
 def order_segments(segments):
@@ -90,13 +89,14 @@ def order_segments(segments):
     return np.array(verts)
 
 
-def segment_in_polygon(pt1, pt2, poly_verts):
+def segments_in_polygon(segments, poly_verts):
     """Go to the centroid of the segment, see if it is in the polygon
     """
-    pt1 = np.array(pt1, dtype=float)
-    pt2 = np.array(pt2, dtype=float)
+    segments = np.array(segments, dtype=float)
+    pt1 = segments[:, 0]
+    pt2 = segments[:, 1]
     centroid = (pt1 + pt2) / 2.
-    return points_inside_poly([centroid], poly_verts)
+    return points_inside_poly(centroid, poly_verts)
 
 
 def gather_segments(poly_verts):
@@ -110,72 +110,49 @@ def gather_segments(poly_verts):
     return segments
 
 
-def perpendicular(a):
-    '''Return the perpendicular segment to a
+def get_segment_intersect(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y):
+    '''Get the intersection between two line segments
+
+    Based on response in:
+    http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
     '''
-    b = np.empty_like(a)
-    b[0] = -a[1]
-    b[1] = a[0]
-    return b
+    s1_x = p1_x - p0_x
+    s1_y = p1_y - p0_y
+    s2_x = p3_x - p2_x
+    s2_y = p3_y - p2_y
 
+    s = ((-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) /
+            (-s2_x * s1_y + s1_x * s2_y + 1e-7))
+    t = ((s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) /
+            (-s2_x * s1_y + s1_x * s2_y + 1e-7))
 
-def is_between(a, b, c):
-    '''Determine if point c is between points a and b
-    '''
-    cross = ((c[1] - a[1]) * (b[0] - a[0]) - (c[0] - a[0]) *
-                    (b[1] - a[1]))
-    if abs(cross) > 1e-6:
-        return False
-    dot = (c[0] - a[0]) * (b[0] - a[0]) + (c[1] - a[1]) * (b[1] - a[1])
-    if dot < 0:
-        return False
-    sq_len_ba = ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) *
-                        (b[1] - a[1]))
-    if dot > sq_len_ba:
-        return False
-    return True
-
-
-def segment_intersect(a1, a2, b1, b2):
-    '''Find the intersection between two line segments, if it exists
-    '''
-    a1 = np.array(a1, dtype=float)
-    a2 = np.array(a2, dtype=float)
-    b1 = np.array(b1, dtype=float)
-    b2 = np.array(b2, dtype=float)
-    da = a2 - a1
-    db = b2 - b1
-    dp = a1 - b1
-    dap = perpendicular(da)
-    denom = np.dot(dap, db)
-    num = np.dot(dap, dp)
-    if denom == 0:
-        raise ValueError('Segments do not cross')
-    inter = (num / denom) * db + b1
-    if not is_between(a1, a2, inter) or not is_between(b1, b2, inter):
-        raise ValueError('Segments do not cross')
-    return inter.tolist()
+    keep = (s >= 0) & (s <= 1) & (t >= 0) & (t <= 1)
+    x = p0_x + (t * s1_x)
+    y = p0_y + (t * s1_y)
+    if isinstance(x, np.ndarray):
+        return np.array([x[keep], y[keep]]).T
+    elif keep:
+        return x, y
 
 
 def break_segments(poly1_segments, poly2_segments):
     '''Break up segments if they overlap any segments in the other polygon
     '''
+    poly2_segments = np.array(poly2_segments, dtype=float)
+    p2x = poly2_segments[:, 0, 0]
+    p2y = poly2_segments[:, 0, 1]
+    p3x = poly2_segments[:, 1, 0]
+    p3y = poly2_segments[:, 1, 1]
     new_segs = []
     for seg1 in poly1_segments:
-        inters = []
-        for seg2 in poly2_segments:
-            try:
-                inter = segment_intersect(seg1[0], seg1[1], seg2[0], seg2[1])
-            except ValueError:
-                pass
+        inters = get_segment_intersect(seg1[0][0], seg1[0][1],
+                              seg1[1][0], seg1[1][1],
+                              p2x, p2y, p3x, p3y)
+        if inters.size:
+            if inters.size == 1:
+                new_segs.append(seg1[0], inters)
+                new_segs.append(inters, seg1[1])
             else:
-                inters.append(inter)
-        if inters:
-            if len(inters) == 1:
-                new_segs.append([seg1[0], inters[0]])
-                new_segs.append([seg1[1], inters[0]])
-            else:
-                inters = np.array(inters)
                 pt1 = seg1[0]
                 diff = inters - pt1
                 dist = np.hypot(diff.T[0] ** 2, diff.T[1] ** 2)
@@ -213,12 +190,11 @@ def create_square(max_x, max_y, min_x, min_y):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    poly1_verts = create_square(70, 90, 15, 24)
-    poly2_verts = create_square(60, 100, 20, 30)
+    poly1_verts = create_ellipse(70, 90, 15, 10)
+    poly2_verts = create_ellipse(65, 100, 10, 30)
 
-    segment_intersect(np.array([85, 35]), np.array([25, 35]),
-                      np.array([70, 70]), np.array([70, 24]))
-    verts = combine_polys(poly1_verts, poly2_verts, 'Subtract')
+    verts = combine_polys(poly1_verts, poly2_verts, 'Add')
+    verts = np.array(verts)
     #plt.plot(poly1_verts.T[0], poly1_verts.T[1])
     #plt.plot(poly2_verts.T[0], poly2_verts.T[1])
     plt.plot(verts.T[0], verts.T[1], '--')

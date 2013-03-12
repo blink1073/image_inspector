@@ -428,7 +428,7 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(subplot_kw=subplot_kw)
 
     pts = ax.scatter(data[:, 0], data[:, 1], s=80)
-    selector = SelectFromCollection(ax, pts, shape='Ellipse')
+    selector = SelectFromCollection(ax, pts, shape='Lasso')
 
     plt.show()
     raw_input('Press any key to accept selected points')
