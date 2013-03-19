@@ -5,67 +5,118 @@ Created on Tue Mar  5 21:11:25 2013
 @author: silvester
 """
 import numpy as np
-from matplotlib.widgets import AxesWidget
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from matplotlib.path import Path
 import polygon_math
+
+from skimage.viewer.canvastools.base import CanvasToolBase
+from skimage.viewer.canvastools.base import ToolHandles
+
+
+# todo: break into a marquee tool and a lasso tool that have access to the axis
 
 
 class Transform(object):
     pass
 
 
-# TODO: finishing a current tool brings out a transform tool for rectangle and square
-#        but it only works on the current tool
+class MyToolHandles(ToolHandles):
+
+    @property
+    def x(self):
+        return np.array(self._markers.get_xdata())
+
+    def closest(self, x, y):
+        """Return index and pixel distance to closest index."""
+        pts = np.transpose((self.x, self.y))
+        # Transform data coordinates to pixel coordinates.
+        pts = self.ax.transData.transform(pts)
+        diff = pts - ((x, y))
+        if self.x.size == 1:
+            return 0, np.hypot(*diff)
+        else:
+            dist = np.sqrt(np.sum(diff**2, axis=1))
+            return np.argmin(dist), np.min(dist)
 
 
-class Selector(AxesWidget):
+class SelectionTool(CanvasToolBase):
+    """Widget for selecting a rectangular region in a plot.
 
-    def __init__(self, ax, onselect=None, useblit=True, lineprops=None,
-                 shape='Lasso'):
-        AxesWidget.__init__(self, ax)
+    After making the desired selection, press "Enter" to accept the selection
+    and call the `on_enter` callback function.
 
-        self.useblit = useblit
-        self.onselect = onselect
+    Parameters
+    ----------
+    ax : :class:`matplotlib.axes.Axes`
+        Matplotlib axes where tool is displayed.
+    on_move : function
+        Function called whenever a control handle is moved.
+        This function must accept the rectangle extents as the only argument.
+    on_finish : function
+        Function called whenever the control handle is released.
+    on_enter : function
+        Function called whenever the "enter" key is pressed.
+    maxdist : float
+        Maximum pixel distance allowed when selecting control handle.
+    rect_props : dict
+        Properties for :class:`matplotlib.patches.Rectangle`. This class
+        redefines defaults in :class:`matplotlib.widgets.RectangleSelector`.
 
-        if lineprops is None:
-            lineprops = dict()
-        lineprops.setdefault('linestyle', '-.')
-        lineprops['color'] = 'black'
-        self.line = Line2D([], [], **lineprops)
-        self.line.set_visible(False)
-        self.ax.add_line(self.line)
+    Attributes
+    ----------
+    vertices : list of tuples
+        (x, y) points definining the shape.
+    """
+    def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
+                 on_finish=None, maxdist=10, lineprops=None, shape='Lasso'):
+        CanvasToolBase.__init__(self, ax, on_move=on_move,
+                                on_enter=on_enter, on_release=on_finish)
 
-        self.prev_line = Line2D([], [], **lineprops)
-        self.prev_line.set_visible(False)
-        self.ax.add_line(self.prev_line)
+        if on_enter is None:
+            def on_enter(vertices):
+                print(vertices)
+        self.callback_on_enter = on_enter
 
-        lineprops['linestyle'] = '-'
-        self.extent_line = Line2D([], [], **lineprops)
-        self.extent_line.set_visible(False)
-        self.ax.add_line(self.extent_line)
+        props = dict(linestyle='-.', color='black')
+        props.update(lineprops if lineprops is not None else {})
+
+        self._line = Line2D([], [], **props)
+        self._prev_line = Line2D([], [], **props)
+        for line in [self._line, self._prev_line]:
+            line.set_visible(False)
+            self.ax.add_line(line)
 
         self.connect_event('button_press_event', self.onpress)
         self.connect_event('button_release_event', self.onrelease)
         self.connect_event('motion_notify_event', self.onmove)
-        self.connect_event('draw_event', self.update_background)
         self.connect_event('key_press_event', self.onkey)
         self.connect_event('key_release_event', self.offkey)
 
         self.mode = 'New'
+        self.callback_on_finish = self.callback_on_release
+
+        self._prev_verts = None
+        self._prev_prev_verts = None
+
+        self.modifiers = set()
+        self._prev_modifiers = set()
+        self.drawing = False
+
+        self._timer = self.ax.figure.canvas.new_timer(interval=1000)
+        self._timer.add_callback(self.ontimer)
+        self._timer.start()
+        self._timer_count = 0
+
+        self._lasso_tool = LassoSelection(ax)
+        self._marquee_tool = MarqeeSelection(ax, maxdist=maxdist)
+
         self.set_shape(shape)
-        self.ax.selection = []
 
-        self._patch = Rectangle((0, 0), 0, 0)
-        self._patch.set_visible(False)
-        self.ax.add_patch(self._patch)
-        self.modifiers = None
-
-        self.timer = self.ax.figure.canvas.new_timer(interval=1000)
-        self.timer.add_callback(self.ontimer)
-        self.timer.start()
-        self.timer_count = 0
+        self._artists = [self._line,
+                         self._prev_line]
+        self._artists.extend(self._lasso_tool._artists)
+        self._artists.extend(self._marquee_tool._artists)
 
     def onkey(self, event):
         '''Update our modifiers on a key press
@@ -74,6 +125,12 @@ class Selector(AxesWidget):
             self.tool.add_modifier(event.key)
         else:
             self.modifiers.add(event.key)
+        if event.key == 'ctrl+r':
+            self.set_shape('Rectangle')
+        elif event.key == 'ctrl+l':
+            self.set_shape('Lasso')
+        elif event.key == 'ctrl+e':
+            self.set_shape('Ellipse')
 
     def offkey(self, event):
         '''Update our modifiers on a key release
@@ -104,12 +161,13 @@ class Selector(AxesWidget):
         '''
         if self.ignore(event):
             return
+        self.drawing = True
+        if self.modifiers:
+            self._prev_line.set_visible(True)
         self.tool.onpress(event)
-        self.prev_line.set_visible(True)
-        if (isinstance(self.tool, LassoSelection) and
-                (self._patch.get_visible() or event.dblclick)):
-            self.tool.verts = self.tool.verts[:-2]
-            self.tool.finalize()
+        if self.tool == self._marquee_tool and self.tool.active_handle:
+            self.modifiers = self.modifiers.union(self._prev_modifiers)
+            self._prev_verts = self._prev_prev_verts
         self.update(self.tool.verts)
 
     def ignore(self, event):
@@ -124,48 +182,35 @@ class Selector(AxesWidget):
         if self.tool.finished and not self.tool.verts is None:
             self.finalize()
             return
-        self.show_close()
         self.draw_line(self.tool.verts)
 
     def draw_line(self, verts):
         if not verts:
             return
-        self.line.set_data(zip(*verts))
-        self.line.set_visible(True)
-
-        if isinstance(self.tool, EllipticalSelection):
-            self.extent_line.set_visible(True)
-            ext_verts = self.tool.extents.tolist() + [self.tool.extents[0]]
-            self.extent_line.set_data(zip(*ext_verts))
-        self.update_plot()
-
-    def update_plot(self):
-        if self.useblit:
-            self.canvas.restore_region(self.background)
-            self.ax.draw_artist(self.line)
-            self.ax.draw_artist(self.prev_line)
-            self.ax.draw_artist(self.extent_line)
-            self.ax.draw_artist(self._patch)
-            self.canvas.blit(self.ax.bbox)
-        else:
-            self.canvas.draw_idle()
+        self._line.set_data(zip(*verts))
+        self._line.set_visible(True)
+        if len(verts) == 1:
+            self.tool.set_visible(False)
+        self.redraw()
 
     def ontimer(self):
-        if not self.line.get_visible():
+        if not self._line.get_visible():
             return
-        self.line.set_linestyle('--')
-        self.timer_count += 1
-        if self.timer_count % 2:
-            self.line.set_dashes([4, 2, 6, 4])
+        self._line.set_linestyle('--')
+        self._timer_count += 1
+        if self._timer_count % 2:
+            self._line.set_dashes([4, 2, 6, 4])
         else:
-            self.line.set_dashes([4, 3, 6, 4])
-        self.update_plot()
+            self._line.set_dashes([4, 3, 6, 4])
+        self.redraw()
 
     def finalize(self):
         '''Take the appropriate action based on mode
         '''
+        if not self.drawing:
+            return
         verts = self.tool.verts
-        if self.ax.selection and self.modifiers:
+        if self._prev_verts is not None and self.modifiers:
             if 'ctrl+shift' in self.modifiers:
                 mode = 'Intersect'
             elif 'shift' in self.modifiers:
@@ -175,71 +220,54 @@ class Selector(AxesWidget):
             else:
                 mode = None
             try:
-                verts = polygon_math.combine_polys(self.ax.selection,
+                verts = polygon_math.combine_polys(self._prev_verts,
                                                    self.tool.verts,
                                                    mode)
             except (ValueError, IndexError):
                 pass
-        self.onselect(verts)
-        self.ax.selection = verts
+        self.callback_on_finish(verts)
+        self._prev_prev_verts = self._prev_verts
+        self._prev_verts = verts
         self.tool.active = False
-        self.tool.verts = None
-        self._patch.set_visible(False)
+
         self.draw_line(verts)
-        self.prev_line.set_data(zip(*verts))
-        self.prev_line.set_visible(False)
+        self._prev_line.set_data(zip(*verts))
+        self._prev_line.set_visible(False)
+        self._prev_modifiers = self.modifiers
         self.modifiers = set()
+        self.drawing = False
+        self.tool.cleanup()
 
     def set_shape(self, shape):
         if shape == 'Rectangle':
-            self.tool = RectangleSelection()
+            self.tool = self._marquee_tool
+            self.tool.shape = 'Rectangle'
         elif shape == 'Ellipse':
-            self.tool = EllipticalSelection()
+            self.tool = self._marquee_tool
+            self.tool.shape = 'Ellipse'
         elif shape == 'Lasso':
-            self.tool = LassoSelection()
+            self.tool = self._lasso_tool
+        self._marquee_tool.set_visible(False)
 
-    def update_background(self, event):
-        if self.ignore(event):
-            return
-        if self.useblit:
-            self.background = self.canvas.copy_from_bbox(self.ax.bbox)
-
-    def show_close(self):
-        if not isinstance(self.tool, LassoSelection) or not self.tool.verts:
-            return
-        bounds = self.ax.dataLim.bounds
-        wid = float(bounds[2] - bounds[0])
-        hgt = float(bounds[3] - bounds[1])
-        orig = self.tool.verts[0]
-        curr = self.tool.verts[-1]
-        # see if we are within 2% in x and y
-        if (abs(curr[0] - orig[0]) / wid < 0.02 and
-            abs(curr[1] - orig[1]) / hgt < 0.02):
-                wid /= 100.
-                hgt /= 100.
-                self._patch.set_xy((orig[0] - wid / 2., orig[1] - hgt / 2.))
-                self._patch.set_width(wid)
-                self._patch.set_height(hgt)
-                self._patch.set_visible(True)
-                self.update_plot()
-        else:
-            self._patch.set_visible(False)
-            self.update_plot()
+    def geometry(self):
+        return self.tool.verts
 
 
-class SelectorTool(object):
+class BaseSelector(CanvasToolBase):
 
-    def __init__(self):
-        self.active = False
-        self.verts = []
+    def __init__(self, ax):
+        CanvasToolBase.__init__(self, ax)
+        self.verts = None
         self.modifiers = set()
         self.finished = False
+        self._prev_verts = None
 
     def onmove(self, event):
         pass
 
     def finalize(self):
         self.finished = True
+        self.modifiers = set()
 
     def onrelease(self, event):
         self.finalize()
@@ -258,20 +286,31 @@ class SelectorTool(object):
         self.verts = [(event.xdata, event.ydata)]
         self.finished = False
 
+    def cleanup(self):
+        pass
 
-class LassoSelection(SelectorTool):
+    def geometry(self):
+        return self.verts
 
-    def __init__(self):
-        SelectorTool.__init__(self)
+
+class LassoSelection(BaseSelector):
+
+    def __init__(self, ax):
+        BaseSelector.__init__(self, ax)
         self.mode = 'lasso'
+        self._indicator = Rectangle((0, 0), 0, 0)
+        self._indicator.set_visible(False)
+        ax.add_patch(self._indicator)
+        self._artists = [self._indicator]
 
     def onmove(self, event):
-        if not self.active or not len(self.verts):
+        if not self.active or self.verts is None:
             return
         if self.mode == 'polygon':
             self.verts[-1] = (event.xdata, event.ydata)
         else:
             self.verts.append((event.xdata, event.ydata))
+        self.show_close()
 
     def onrelease(self, event):
         if not self.active:
@@ -279,6 +318,10 @@ class LassoSelection(SelectorTool):
         self.mode = 'polygon'
 
     def onpress(self, event):
+        if self._indicator.get_visible() or event.dblclick:
+            self.verts = self.verts[:-2]
+            self.finalize()
+            return
         if not self.verts:
             self.start(event)
         self.mode = 'lasso'
@@ -287,34 +330,96 @@ class LassoSelection(SelectorTool):
     def finalize(self):
         self.verts.append(self.verts[0])
         self.finished = True
+        self.active = False
+
+    def cleanup(self):
+        self.verts = None
+        self._indicator.set_visible(False)
+
+    def show_close(self):
+        if not self.verts:
+            return
+        bounds = self.ax.dataLim.bounds
+        wid = float(bounds[2] - bounds[0])
+        hgt = float(bounds[3] - bounds[1])
+        orig = self.verts[0]
+        curr = self.verts[-1]
+        # see if we are within 2% in x and y
+        if (abs(curr[0] - orig[0]) / wid < 0.02 and
+            abs(curr[1] - orig[1]) / hgt < 0.02):
+                wid /= 100.
+                hgt /= 100.
+                self._indicator.set_xy((orig[0] - wid / 2.,
+                                              orig[1] - hgt / 2.))
+                self._indicator.set_width(wid * 2)
+                self._indicator.set_height(hgt * 2)
+                if not self._indicator.get_visible():
+                    self._indicator.set_visible(True)
+                    self.redraw()
+        elif self._indicator.get_visible():
+            self._indicator.set_visible(False)
+            self.redraw()
 
 
-class RectangleSelection(SelectorTool):
+class MarqeeSelection(BaseSelector):
 
-    def __init__(self):
-        SelectorTool.__init__(self)
+    def __init__(self, shape='Rectangle', maxdist=10):
+        BaseSelector.__init__(self, ax)
         self.anchor = None
         self.origin = None
         self.origin_pix = None
-        self.extents = []
+        self.extents = [0, 0, 0, 0]
+        self.shape = shape
+        self.maxdist = maxdist
+        self.active_handle = None
+        x = (0, 0, 0, 0)
+        y = (0, 0, 0, 0)
+        props = dict()
+        self._center_handle = MyToolHandles(ax, x, y, marker='s',
+                                          marker_props=props)
+        self._corner_handles = ToolHandles(ax, x, y, marker_props=props)
+        self._edge_handles = ToolHandles(ax, x, y, marker='s',
+                                         marker_props=props)
+        self._corner_order = ['NW', 'NE', 'SE', 'SW']
+        self._edge_order = ['W', 'N', 'E', 'S']
+        self._artists = [self._center_handle.artist,
+                         self._corner_handles.artist,
+                         self._edge_handles.artist]
 
     def start(self, event):
-        SelectorTool.start(self, event)
+        self.verts = None
+        self.anchor = None
+        BaseSelector.start(self, event)
         self.origin = self.verts[0]
         self.origin_pix = (event.x, event.y)
-        self.extents = np.vstack(self.verts * 4)
+        if not self.active_handle == 'C':
+            self.extents = [0, 0, 0, 0]
+        self.set_visible(True)
 
     def onmove(self, event):
-        if not self.origin or not self.active:
+        if not self.origin or not self.active or self.finished:
             return
-        if ' ' in self.modifiers:
+        if self.active_handle and not self.active_handle == 'C':
+            x1, x2, y1, y2 = self._extents_on_press
+            if self.active_handle in ['E', 'W'] + self._corner_order:
+                x2 = event.xdata
+            if self.active_handle in ['N', 'S'] + self._corner_order:
+                y2 = event.ydata
+            self.modifiers = set()
+            self.extents = np.array([x1, x2, y1, y2])
+        elif ' ' in self.modifiers or self.active_handle == 'C':
             # move command
             if not self.anchor:
                 self.anchor = event.xdata, event.ydata
             else:
                 dx = event.xdata - self.anchor[0]
                 dy = event.ydata - self.anchor[1]
-                self.extents += np.array([dx, dy])
+                x1, x2, y1, y2 = self.extents
+                x1 += dx
+                x2 += dx
+                y1 += dy
+                y2 += dy
+                self.extents = np.array([x1, x2, y1, y2])
                 self.origin = [self.origin[0] + dx, self.origin[1] + dy]
                 self.anchor = event.xdata, event.ydata
         else:
@@ -337,30 +442,106 @@ class RectangleSelection(SelectorTool):
             else:
                 # from corner
                 center += np.array([dx, dy])
-            self.extents = np.vstack((center + [dx, dy],
-                                       center + [dx, -dy],
-                                       center + [-dx, -dy],
-                                       center + [-dx, dy]))
+            self.extents = np.array([center[0] - dx, center[0] + dx,
+                                    center[1] - dy, center[1] + dy])
         self.set_verts()
 
     def set_verts(self):
-        self.verts = self.extents.tolist() + [self.extents[0]]
+        self.set_extents()
+        x1, x2, y1, y2 = self.extents
+        if self.shape == 'Rectangle':
+            self.verts = [[x1, y1], [x1, y2], [x2, y2], [x2, y1],
+                          [x1, y1]]
+        else:
+            # create an elliptical path within the extents
+            min_x, max_x = np.sort((x1, x2))
+            min_y, max_y = np.sort((y1, y2))
+            a = (max_x - min_x) / 2.
+            b = (max_y - min_y) / 2.
+            center = [min_x + a, min_y + b]
+            rad = np.arange(31) * 12 * np.pi / 180
+            x = a * np.cos(rad)
+            y = b * np.sin(rad)
+            self.verts = np.vstack((x, y)).T + center
+            self.verts = self.verts.tolist()
 
+    def onrelease(self, event):
+        self._extents_on_press = None
+        self.finalize()
 
-class EllipticalSelection(RectangleSelection):
+    def onpress(self, event):
+        self._set_active_handle(event)
+        BaseSelector.onpress(self, event)
 
-    def set_verts(self):
-        # create an elliptical path within the extents
-        max_x, max_y = np.max(self.extents, axis=0)
-        min_x, min_y = np.min(self.extents, axis=0)
-        a = (max_x - min_x) / 2.
-        b = (max_y - min_y) / 2.
-        center = [min_x + a, min_y + b]
-        rad = np.arange(31) * 12 * np.pi / 180
-        x = a * np.cos(rad)
-        y = b * np.sin(rad)
-        self.verts = np.vstack((x, y)).T + center
-        self.verts = self.verts.tolist()
+    def _set_active_handle(self, event):
+        """Set active handle based on the location of the mouse event"""
+        # Note: event.xdata/ydata in data coordinates, event.x/y in pixels
+        c_idx, c_dist = self._corner_handles.closest(event.x, event.y)
+        e_idx, e_dist = self._edge_handles.closest(event.x, event.y)
+        m_idx, m_dist = self._center_handle.closest(event.x, event.y)
+
+        # Set active handle as closest handle, if mouse click is close enough.
+        if c_dist > self.maxdist and e_dist > self.maxdist:
+            self.active_handle = None
+        elif c_dist < e_dist:
+            self.active_handle = self._corner_order[c_idx]
+        else:
+            self.active_handle = self._edge_order[e_idx]
+        if not self.active_handle and m_dist < self.maxdist:
+            self.active_handle = 'C'
+        # Save coordinates of rectangle at the start of handle movement.
+        x1, x2, y1, y2 = self.extents
+        # Switch variables so that only x2 and/or y2 are updated on move.
+        if self.active_handle in ['W', 'SW', 'NW']:
+            x1, x2 = x2, event.xdata
+        if self.active_handle in ['N', 'NW', 'NE']:
+            y1, y2 = y2, event.ydata
+        self._extents_on_press = x1, x2, y1, y2
+
+    @property
+    def _rect_bbox(self):
+        if not len(self.extents):
+            return 0, 0, 0, 0
+        x1, x2, y1, y2 = self.extents.tolist()
+        x0, x1 = np.sort((x1, x2))
+        y0, y1 = np.sort((y1, y2))
+        width = x1 - x0
+        height = y1 - y0
+        return x0, y0, width, height
+
+    @property
+    def corners(self):
+        """Corners of rectangle from lower left, moving clockwise."""
+        x0, y0, width, height = self._rect_bbox
+        xc = x0, x0 + width, x0 + width, x0
+        yc = y0, y0, y0 + height, y0 + height
+        return xc, yc
+
+    @property
+    def edge_centers(self):
+        """Midpoint of rectangle edges from left, moving clockwise."""
+        x0, y0, width, height = self._rect_bbox
+        w = width / 2.
+        h = height / 2.
+        xe = x0, x0 + w, x0 + width, x0 + w
+        ye = y0 + h, y0, y0 + h, y0 + height
+        return xe, ye
+
+    def set_extents(self):
+        x1, x2, y1, y2 = self.extents
+        xmin, xmax = np.sort([x1, x2])
+        ymin, ymax = np.sort([y1, y2])
+        self.extents = np.array([xmin, xmax, ymin, ymax])
+
+        # Update displayed handles
+        self._center_handle.set_data((x2 + x1) / 2, (y2 + y1) / 2)
+        self._corner_handles.set_data(*self.corners)
+        self._edge_handles.set_data(*self.edge_centers)
+
+        self._center_handle.set_visible(True)
+        self._corner_handles.set_visible(True)
+        self._edge_handles.set_visible(True)
+        self.redraw()
 
 
 class SelectFromCollection(object):
@@ -400,7 +581,7 @@ class SelectFromCollection(object):
         elif len(self.fc) == 1:
             self.fc = np.tile(self.fc, self.Npts).reshape(self.Npts, -1)
 
-        self.selector = Selector(ax, onselect=self.onselect, shape=shape)
+        self.selector = SelectionTool(ax, on_finish=self.onselect, shape=shape)
         self.ind = []
 
     def onselect(self, verts):
@@ -428,7 +609,7 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(subplot_kw=subplot_kw)
 
     pts = ax.scatter(data[:, 0], data[:, 1], s=80)
-    selector = SelectFromCollection(ax, pts, shape='Lasso')
+    selector = SelectFromCollection(ax, pts, shape='Ellipse')
 
     plt.show()
     raw_input('Press any key to accept selected points')
