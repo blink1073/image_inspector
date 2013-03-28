@@ -113,43 +113,6 @@ class PointTool(CanvasToolBase):
         x, y = pt
         self.update_point(x, y)
 
-    def activate(self):
-        self.active = True
-        if hasattr(self, '_point'):
-            self._point.set_visible(False)
-        self.redraw()
-
-
-class CenteredWindow(object):
-    """Window that create slices numpy arrays over 2D windows.
-
-    Example
-    -------
-    >>> a = np.arange(16).reshape(4, 4)
-    >>> w = CenteredWindow(1, a.shape)
-    >>> a[w.at(1, 1)]
-    array([[ 0,  1,  2],
-           [ 4,  5,  6],
-           [ 8,  9, 10]])
-    >>> a[w.at(0, 0)]
-    array([[0, 1],
-           [4, 5]])
-    >>> a[w.at(4, 3)]
-    array([[14, 15]])
-    """
-    def __init__(self, radius, array_shape):
-        self.radius = radius
-        self.array_shape = array_shape
-
-    def at(self, row, col):
-        h, w = self.array_shape
-        r = self.radius
-        xmin = max(0, col - r)
-        xmax = min(w, col + r + 1)
-        ymin = max(0, row - r)
-        ymax = min(h, row + r + 1)
-        return [slice(ymin, ymax), slice(xmin, xmax)]
-
 
 if __name__ == '__main__':
     np.testing.rundocs()

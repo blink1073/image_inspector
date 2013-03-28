@@ -41,7 +41,7 @@ class SelectionTool(CanvasToolBase):
         (x, y) points definining the shape.
     """
     def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
-                 on_finish=None, maxdist=10, lineprops=None, shape='Lasso'):
+                 on_finish=None, maxdist=10, lineprops=None, shape='rectangle'):
         CanvasToolBase.__init__(self, ax, on_move=on_move,
                                 on_enter=on_enter, on_release=on_finish)
 
@@ -534,3 +534,19 @@ class MarqeeSelection(BaseSelector):
         self._corner_handles.set_visible(True)
         self._edge_handles.set_visible(True)
         self.redraw()
+
+
+if __name__ == '__main__':
+    np.testing.rundocs()
+    import matplotlib.pyplot as plt
+    from skimage import data
+
+    image = data.camera()
+
+    def print_geometry(geometry):
+        print geometry
+
+    f, ax = plt.subplots()
+    ax.imshow(image, interpolation='nearest')
+    tool = SelectionTool(ax, on_release=print_geometry)
+    plt.show()

@@ -44,12 +44,12 @@ class ROITool(CanvasToolBase):
         self.redraw()
 
     def set_shape(self, shape='Rectangle'):
-        if shape in ['Rectangle', 'Ellipse', 'Lasso']:
+        if shape.lower() in ['rectangle', 'ellipse', 'lasso']:
             self.activate_tool(self.selector)
             self.selector.set_shape(shape)
-        elif shape == 'Line':
+        elif shape.lower() == 'line':
             self.activate_tool(self.line)
-        elif shape == 'Point':
+        elif shape.lower() == 'point':
             self.activate_tool(self.point)
 
     @property
@@ -58,7 +58,13 @@ class ROITool(CanvasToolBase):
 
     @geometry.setter
     def geometry(self, pts):
-        self._active_tool.geometry = pts
+        if len(pts) == 1:
+            self.set_shape('point')
+        elif len(pts) == 2:
+            self.set_shape('line')
+        else:
+            self.set_shape('lasso')
+        self._active_tool.geometry = np.array(pts)
 
 
 class SelectFromCollection(object):
@@ -102,13 +108,12 @@ class SelectFromCollection(object):
         self.ind = []
 
     def onselect(self, verts):
-        print verts
-        if len(verts) < 3:
-            return
-        path = Path(verts)
-        self.ind = np.nonzero([path.contains_point(xy) for xy in self.xys])[0]
+        verts = np.array(verts)
         self.fc[:, -1] = self.alpha_other
-        self.fc[self.ind, -1] = 1
+        if verts.size >= 5:
+            path = Path(verts)
+            self.ind = np.nonzero([path.contains_point(xy) for xy in self.xys])[0]
+            self.fc[self.ind, -1] = 1
         self.collection.set_facecolors(self.fc)
         self.canvas.draw_idle()
 
