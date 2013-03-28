@@ -10,11 +10,9 @@ from matplotlib.patches import Rectangle
 from matplotlib.path import Path
 import polygon_math
 
-from skimage.viewer.canvastools.base import CanvasToolBase
-from skimage.viewer.canvastools.base import ToolHandles
-
-
-# todo: break into a marquee tool and a lasso tool that have access to the axis
+from base import CanvasToolBase, ToolHandles
+from linetool import LineTool
+from point_tool import PointTool
 
 
 class Transform(object):
@@ -165,7 +163,7 @@ class SelectionTool(CanvasToolBase):
         if self.modifiers:
             self._prev_line.set_visible(True)
         self.tool.onpress(event)
-        if self.tool == self._marquee_tool and self.tool.active_handle:
+        if hasattr(self.tool, 'active_handle') and self.tool.active_handle:
             self.modifiers = self.modifiers.union(self._prev_modifiers)
             self._prev_verts = self._prev_prev_verts
         self.update(self.tool.verts)
@@ -251,6 +249,19 @@ class SelectionTool(CanvasToolBase):
 
     def geometry(self):
         return self.tool.verts
+
+    def activate(self):
+        self.active = True
+        if hasattr(self, 'tool'):
+            self.tool.active = True
+        self.redraw()
+        self.modifiers = set()
+
+    def deactivate(self):
+        self.active = False
+        self.tool.active = False
+        self.set_visible(False)
+        self.modifiers = set()
 
 
 class BaseSelector(CanvasToolBase):
@@ -581,8 +592,33 @@ class SelectFromCollection(object):
         elif len(self.fc) == 1:
             self.fc = np.tile(self.fc, self.Npts).reshape(self.Npts, -1)
 
+        ax.figure.canvas.mpl_connect('key_press_event', self._on_key_press)
         self.selector = SelectionTool(ax, on_finish=self.onselect, shape=shape)
+        self.line = LineTool(ax, on_release=self.on_line)
+        self.point_tool = PointTool(ax, on_release=self.on_line)
+
+        self.line.active = False
+        self.selector.active = False
         self.ind = []
+
+    def _on_key_press(self, event):
+        if event.key == 'ctrl+p':
+            self.line.deactivate()
+            self.selector.deactivate()
+            self.point_tool.activate()
+        elif event.key in ['ctrl+l', 'ctrl+r', 'ctrl+e']:
+            self.line.deactivate()
+            self.point_tool.deactivate()
+            self.selector.activate()
+            self.selector._on_key_press(event)
+        elif event.key == 'ctrl+n':
+            self.point_tool.deactivate()
+            self.selector.deactivate()
+            self.line.activate()
+        self.line.ax.figure.canvas.draw_idle()
+
+    def on_line(self, verts):
+        print verts
 
     def onselect(self, verts):
         path = Path(verts)
