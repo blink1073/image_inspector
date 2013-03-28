@@ -120,6 +120,10 @@ class LineTool(CanvasToolBase):
     def geometry(self):
         return self.end_points
 
+    @geometry.setter
+    def geometry(self, points):
+        self.end_points = points
+
     def activate(self):
         self.active = True
         self.set_visible(True)

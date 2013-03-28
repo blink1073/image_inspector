@@ -7,35 +7,9 @@ Created on Tue Mar  5 21:11:25 2013
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
-from matplotlib.path import Path
 import polygon_math
 
 from base import CanvasToolBase, ToolHandles
-from linetool import LineTool
-from point_tool import PointTool
-
-
-class Transform(object):
-    pass
-
-
-class MyToolHandles(ToolHandles):
-
-    @property
-    def x(self):
-        return np.array(self._markers.get_xdata())
-
-    def closest(self, x, y):
-        """Return index and pixel distance to closest index."""
-        pts = np.transpose((self.x, self.y))
-        # Transform data coordinates to pixel coordinates.
-        pts = self.ax.transData.transform(pts)
-        diff = pts - ((x, y))
-        if self.x.size == 1:
-            return 0, np.hypot(*diff)
-        else:
-            dist = np.sqrt(np.sum(diff**2, axis=1))
-            return np.argmin(dist), np.min(dist)
 
 
 class SelectionTool(CanvasToolBase):
@@ -237,18 +211,25 @@ class SelectionTool(CanvasToolBase):
         self.tool.cleanup()
 
     def set_shape(self, shape):
-        if shape == 'Rectangle':
+        if shape.lower() == 'rectangle':
             self.tool = self._marquee_tool
             self.tool.shape = 'Rectangle'
-        elif shape == 'Ellipse':
+        elif shape.lower() == 'ellipse':
             self.tool = self._marquee_tool
             self.tool.shape = 'Ellipse'
-        elif shape == 'Lasso':
+        elif shape.lower() == 'lasso':
             self.tool = self._lasso_tool
         self._marquee_tool.set_visible(False)
 
+    @property
     def geometry(self):
         return self.tool.verts
+
+    @geometry.setter
+    def geometry(self, points):
+        self.set_shape('lasso')
+        self.tool.verts = points
+        self.finalize()
 
     def activate(self):
         self.active = True
@@ -374,7 +355,7 @@ class LassoSelection(BaseSelector):
 
 class MarqeeSelection(BaseSelector):
 
-    def __init__(self, shape='Rectangle', maxdist=10):
+    def __init__(self, ax, shape='Rectangle', maxdist=10):
         BaseSelector.__init__(self, ax)
         self.anchor = None
         self.origin = None
@@ -386,7 +367,7 @@ class MarqeeSelection(BaseSelector):
         x = (0, 0, 0, 0)
         y = (0, 0, 0, 0)
         props = dict()
-        self._center_handle = MyToolHandles(ax, x, y, marker='s',
+        self._center_handle = ToolHandles(ax, x, y, marker='s',
                                           marker_props=props)
         self._corner_handles = ToolHandles(ax, x, y, marker_props=props)
         self._edge_handles = ToolHandles(ax, x, y, marker='s',
@@ -460,7 +441,7 @@ class MarqeeSelection(BaseSelector):
     def set_verts(self):
         self.set_extents()
         x1, x2, y1, y2 = self.extents
-        if self.shape == 'Rectangle':
+        if self.shape.lower() == 'rectangle':
             self.verts = [[x1, y1], [x1, y2], [x2, y2], [x2, y1],
                           [x1, y1]]
         else:
@@ -553,105 +534,3 @@ class MarqeeSelection(BaseSelector):
         self._corner_handles.set_visible(True)
         self._edge_handles.set_visible(True)
         self.redraw()
-
-
-class SelectFromCollection(object):
-    """Select indices from a matplotlib collection using `LassoSelector`.
-
-    Selected indices are saved in the `ind` attribute. This tool highlights
-    selected points by fading them out (i.e., reducing their alpha values).
-    If your collection has alpha < 1, this tool will permanently alter them.
-
-    Note that this tool selects collection objects based on their *origins*
-    (i.e., `offsets`).
-
-    Parameters
-    ----------
-    ax : :class:`~matplotlib.axes.Axes`
-        Axes to interact with.
-
-    collection : :class:`matplotlib.collections.Collection` subclass
-        Collection you want to select from.
-
-    alpha_other : 0 <= float <= 1
-        To highlight a selection, this tool sets all selected points to an
-        alpha value of 1 and non-selected points to `alpha_other`.
-    """
-    def __init__(self, ax, collection, alpha_other=0.3, shape='Rectangle'):
-        self.canvas = ax.figure.canvas
-        self.collection = collection
-        self.alpha_other = alpha_other
-
-        self.xys = collection.get_offsets()
-        self.Npts = len(self.xys)
-
-        # Ensure that we have separate colors for each object
-        self.fc = collection.get_facecolors()
-        if len(self.fc) == 0:
-            raise ValueError('Collection must have a facecolor')
-        elif len(self.fc) == 1:
-            self.fc = np.tile(self.fc, self.Npts).reshape(self.Npts, -1)
-
-        ax.figure.canvas.mpl_connect('key_press_event', self._on_key_press)
-        self.selector = SelectionTool(ax, on_finish=self.onselect, shape=shape)
-        self.line = LineTool(ax, on_release=self.on_line)
-        self.point_tool = PointTool(ax, on_release=self.on_line)
-
-        self.line.active = False
-        self.selector.active = False
-        self.ind = []
-
-    def _on_key_press(self, event):
-        if event.key == 'ctrl+p':
-            self.line.deactivate()
-            self.selector.deactivate()
-            self.point_tool.activate()
-        elif event.key in ['ctrl+l', 'ctrl+r', 'ctrl+e']:
-            self.line.deactivate()
-            self.point_tool.deactivate()
-            self.selector.activate()
-            self.selector._on_key_press(event)
-        elif event.key == 'ctrl+n':
-            self.point_tool.deactivate()
-            self.selector.deactivate()
-            self.line.activate()
-        self.line.ax.figure.canvas.draw_idle()
-
-    def on_line(self, verts):
-        print verts
-
-    def onselect(self, verts):
-        path = Path(verts)
-        self.ind = np.nonzero([path.contains_point(xy) for xy in self.xys])[0]
-        self.fc[:, -1] = self.alpha_other
-        self.fc[self.ind, -1] = 1
-        self.collection.set_facecolors(self.fc)
-        self.canvas.draw_idle()
-
-    def disconnect(self):
-        self.selector.disconnect_events()
-        self.fc[:, -1] = 1
-        self.collection.set_facecolors(self.fc)
-        self.canvas.draw_idle()
-
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    #plt.ion()
-    data = np.random.rand(100, 2)
-
-    subplot_kw = dict(xlim=(0, 1), ylim=(0, 1), autoscale_on=False)
-    fig, ax = plt.subplots(subplot_kw=subplot_kw)
-
-    pts = ax.scatter(data[:, 0], data[:, 1], s=80)
-    selector = SelectFromCollection(ax, pts, shape='Ellipse')
-
-    plt.show()
-    raw_input('Press any key to accept selected points')
-    print("Selected points:")
-    print(selector.xys[selector.ind])
-    selector.disconnect()
-
-    # Block end of script so you can check that the lasso is disconnected.
-    raw_input('Press any key to quit')

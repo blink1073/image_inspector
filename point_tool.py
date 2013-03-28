@@ -92,7 +92,6 @@ class PointTool(CanvasToolBase):
         if not self.active:
             return
         self.update_point(event.xdata, event.ydata)
-        self.redraw()
 
     def on_mouse_release(self, event):
         if event.button != 1 or not self.active:
@@ -103,10 +102,16 @@ class PointTool(CanvasToolBase):
         self._point.set_visible(True)
         self._point.center = (x, y)
         self._position = (x, y)
+        self.redraw()
 
     @property
     def geometry(self):
         return self._position
+
+    @geometry.setter
+    def geometry(self, pt):
+        x, y = pt
+        self.update_point(x, y)
 
     def activate(self):
         self.active = True
