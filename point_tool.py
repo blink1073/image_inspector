@@ -10,6 +10,7 @@ except ImportError:
     print("Could not import matplotlib -- skimage.viewer not available.")
 
 from base import CanvasToolBase
+from roi import ROI
 
 
 __all__ = ['PointTool']
@@ -103,7 +104,7 @@ class PointTool(CanvasToolBase):
         self._point.set_visible(True)
         self._point.center = (x, y)
         self._position = (x, y)
-        self.canvas.callbacks.process('roi_changed', self)
+        self.canvas.callbacks.process('roi_changed', self.roi)
         self.redraw()
 
     @property
@@ -121,6 +122,10 @@ class PointTool(CanvasToolBase):
             data = self.ax.images[0].get_array()
             x, y = self._position
             return data[y, x]
+
+    @property
+    def roi(self):
+        return ROI('point', self.data, self.geometry)
 
 
 if __name__ == '__main__':

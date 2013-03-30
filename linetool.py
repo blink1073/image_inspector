@@ -7,6 +7,7 @@ except ImportError:
     print("Could not import matplotlib -- skimage.viewer not available.")
 
 from base import CanvasToolBase, ToolHandles
+from roi import ROI
 
 
 __all__ = ['LineTool', 'ThickLineTool']
@@ -113,7 +114,7 @@ class LineTool(CanvasToolBase):
             return
         self.update(event.xdata, event.ydata)
         self.callback_on_move(self.geometry)
-        self.canvas.callbacks.process('roi_changed', self)
+        self.canvas.callbacks.process('roi_changed', self.roi)
 
     def update(self, x=None, y=None):
         if x is not None:
@@ -144,8 +145,14 @@ class LineTool(CanvasToolBase):
     @property
     def data(self):
         if self.ax.images:
-            return profile_line(self.ax.images[0].get_array(), self.end_points,
-                                self.linewidth)
+            return self.ax.images[0].get_array()
+
+    @property
+    def roi(self):
+        geometry = self.geometry.tolist()
+        geometry.append(self.linewidth)
+        return ROI('line', self.data, geometry)
+
 
 
 class ThickLineTool(LineTool):
@@ -219,60 +226,6 @@ class ThickLineTool(LineTool):
             self.linewidth -= 1
             self.update()
             self.callback_on_change(self.geometry)
-
-
-def profile_line(img, end_points, linewidth=1):
-    """Return the intensity profile of an image measured along a scan line.
-
-    Parameters
-    ----------
-    img : 2d array
-        The image.
-    end_points: (2, 2) list
-        End points ((x1, y1), (x2, y2)) of scan line.
-    linewidth: int
-        Width of the scan, perpendicular to the line
-
-    Returns
-    -------
-    return_value : array
-        The intensity profile along the scan line. The length of the profile
-        is the ceil of the computed length of the scan line.
-    """
-    point1, point2 = end_points
-    x1, y1 = point1 = np.asarray(point1, dtype=float)
-    x2, y2 = point2 = np.asarray(point2, dtype=float)
-    dx, dy = point2 - point1
-
-    # Quick calculation if perfectly horizontal or vertical (remove?)
-    if x1 == x2:
-        pixels = img[min(y1, y2): max(y1, y2) + 1,
-                     x1 - linewidth / 2:  x1 + linewidth / 2 + 1]
-        intensities = pixels.mean(axis=1)
-        return intensities
-    elif y1 == y2:
-        pixels = img[y1 - linewidth / 2:  y1 + linewidth / 2 + 1,
-                     min(x1, x2): max(x1, x2) + 1]
-        intensities = pixels.mean(axis=0)
-        return intensities
-
-    theta = np.arctan2(dy, dx)
-    a = dy / dx
-    b = y1 - a * x1
-    length = np.hypot(dx, dy)
-
-    line_x = np.linspace(min(x1, x2), max(x1, x2), np.ceil(length))
-    line_y = line_x * a + b
-    y_width = abs(linewidth * np.cos(theta) / 2)
-    perp_ys = np.array([np.linspace(yi - y_width,
-                                    yi + y_width, linewidth) for yi in line_y])
-    perp_xs = - a * perp_ys + (line_x + a * line_y)[:, np.newaxis]
-
-    perp_lines = np.array([perp_ys, perp_xs])
-    pixels = ndi.map_coordinates(img, perp_lines)
-    intensities = pixels.mean(axis=1)
-
-    return intensities
 
 
 if __name__ == '__main__':

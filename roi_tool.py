@@ -15,7 +15,8 @@ from point_tool import PointTool
 
 class ROITool(CanvasToolBase):
 
-    def __init__(self, ax, on_move=None, on_enter=None, on_release=None,
+    def __init__(self, ax, shape='rectangle',
+                 on_move=None, on_enter=None, on_release=None,
                  useblit=True):
         CanvasToolBase.__init__(self, ax, on_move=on_move, on_enter=on_enter,
                             on_release=on_release, useblit=useblit)
@@ -24,7 +25,8 @@ class ROITool(CanvasToolBase):
         self.line = ThickLineTool(ax, on_release=on_release)
         self.point = PointTool(ax, on_release=on_release)
         self.tools = [self.line, self.point, self.selector]
-        self.activate_tool(self.selector)
+        self.connect_event('set_roi', self.set_roi)
+        self.set_shape(shape)
 
     def _on_key_press(self, event):
         if event.key == 'ctrl+p':
@@ -70,6 +72,16 @@ class ROITool(CanvasToolBase):
     @property
     def data(self):
         return self._active_tool.data
+
+    @property
+    def roi(self):
+        return self._active_tool.roi
+
+    def set_roi(self, shape, geometry, linewidth=None):
+        self.set_shape(shape)
+        self.geometry = geometry
+        if linewidth:
+            self._active_tool.linewidth = linewidth
 
 
 class SelectFromCollection(object):

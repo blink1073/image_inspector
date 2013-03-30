@@ -5,12 +5,12 @@ Created on Tue Mar  5 21:11:25 2013
 @author: silvester
 """
 import numpy as np
-from matplotlib.path import Path
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 import polygon_math
 
 from base import CanvasToolBase, ToolHandles
+from roi import ROI
 
 
 class SelectionTool(CanvasToolBase):
@@ -193,9 +193,11 @@ class SelectionTool(CanvasToolBase):
             else:
                 mode = None
             try:
-                verts = polygon_math.combine_polys(self._prev_verts,
-                                                   self.tool.verts,
-                                                   mode)
+                # convert to axis points
+                old = self.ax.transAxes.transform(self._prev_verts)
+                new = self.ax.transAxes.transform(self.tool.verts)
+                verts = polygon_math.combine_polys(old, new, mode)
+                verts = self.ax.transAxes.inverted().transform(verts).tolist()
             except (ValueError, IndexError):
                 pass
         self.callback_on_finish(verts)
@@ -228,8 +230,8 @@ class SelectionTool(CanvasToolBase):
         return self.tool.verts
 
     @geometry.setter
-    def geometry(self, points):
-        self.set_shape('lasso')
+    def geometry(self, shape, points):
+        self.set_shape(shape)
         self.tool.verts = points
         self.finalize()
 
@@ -250,6 +252,10 @@ class SelectionTool(CanvasToolBase):
     def data(self):
         return self.tool.data
 
+    @property
+    def roi(self):
+        return self.tool.roi
+
 
 class BaseSelector(CanvasToolBase):
 
@@ -267,6 +273,9 @@ class BaseSelector(CanvasToolBase):
     def finalize(self):
         self.finished = True
         self.modifiers = set()
+        self.active = False
+        if not self.verts is None and len(self.verts) > 1:
+            self.canvas.callbacks.process('roi_changed', self.roi)
 
     def onrelease(self, event):
         self.finalize()
@@ -294,19 +303,16 @@ class BaseSelector(CanvasToolBase):
 
     @property
     def data(self):
-        path = Path(self.verts)
         if self.ax.images:
             data = self.ax.images[0].get_array()
-            x, y = np.meshgrid(np.arange(data.shape[1]),
-                               np.arange(data.shape[0]))
-            pts = np.vstack((x.ravel(), y.ravel())).T
-            ind = np.nonzero(path.contains_points(pts))[0]
-            return data.ravel()[ind]
+            return data
         elif self.ax.lines:
             x, y = self.ax.lines[0].get_data()
-            pts = np.vstack((x, y)).T
-            ind = np.nonzero(path.contains_points(pts))[0]
-            return pts[ind]
+            return x, y
+
+    @property
+    def roi(self):
+        return ROI(self.shape, self.data, self.geometry)
 
 
 class LassoSelection(BaseSelector):
@@ -317,6 +323,7 @@ class LassoSelection(BaseSelector):
         self.mode = 'lasso'
         self._indicator = Rectangle((0, 0), 0, 0)
         self._indicator.set_visible(False)
+        self._prev_angle = 1e6
         ax.add_patch(self._indicator)
         self._artists = [self._indicator]
 
@@ -326,7 +333,17 @@ class LassoSelection(BaseSelector):
         if self.mode == 'polygon':
             self.verts[-1] = (event.xdata, event.ydata)
         else:
-            self.verts.append((event.xdata, event.ydata))
+            # see if we are moving in the same direction
+            point2 = (event.xdata, event.ydata)
+            point1 = np.asarray(self.verts[-1], dtype=float)
+            point2 = np.asarray(point2, dtype=float)
+            dx, dy = point2 - point1
+            theta = np.arctan2(dy, dx)
+            if theta == self._prev_angle:
+                self.verts[-1] = (event.xdata, event.ydata)
+            else:
+                self.verts.append((event.xdata, event.ydata))
+            self._prev_angle = theta
         self.show_close()
 
     def onrelease(self, event):
@@ -346,9 +363,8 @@ class LassoSelection(BaseSelector):
 
     def finalize(self):
         self.verts.append(self.verts[0])
-        self.finished = True
-        self.active = False
-        self.canvas.callbacks.process('roi_changed', self)
+        self._prev_angle = 1e6
+        BaseSelector.finalize(self)
 
     def cleanup(self):
         self.verts = None
@@ -486,7 +502,6 @@ class MarqeeSelection(BaseSelector):
     def onrelease(self, event):
         self._extents_on_press = None
         self.finalize()
-        self.canvas.callbacks.process('roi_changed', self)
 
     def onpress(self, event):
         self._set_active_handle(event)
