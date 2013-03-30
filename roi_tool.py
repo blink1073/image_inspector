@@ -9,7 +9,7 @@ from matplotlib.path import Path
 
 from base import CanvasToolBase
 from selector_tool import SelectionTool
-from linetool import LineTool
+from linetool import ThickLineTool
 from point_tool import PointTool
 
 
@@ -21,7 +21,7 @@ class ROITool(CanvasToolBase):
                             on_release=on_release, useblit=useblit)
         self.selector = SelectionTool(ax, on_finish=on_release,
                                       shape='rectangle')
-        self.line = LineTool(ax, on_release=on_release)
+        self.line = ThickLineTool(ax, on_release=on_release)
         self.point = PointTool(ax, on_release=on_release)
         self.tools = [self.line, self.point, self.selector]
         self.activate_tool(self.selector)
@@ -51,6 +51,7 @@ class ROITool(CanvasToolBase):
             self.activate_tool(self.line)
         elif shape.lower() == 'point':
             self.activate_tool(self.point)
+        self.shape = shape
 
     @property
     def geometry(self):
@@ -65,6 +66,10 @@ class ROITool(CanvasToolBase):
         else:
             self.set_shape('lasso')
         self._active_tool.geometry = np.array(pts)
+
+    @property
+    def data(self):
+        return self._active_tool.data
 
 
 class SelectFromCollection(object):
@@ -130,11 +135,15 @@ if __name__ == '__main__':
     #plt.ion()
     data = np.random.rand(100, 2)
 
+    def roi_changed(roi):
+        print roi.shape, len(roi.geometry), type(roi.data)
+
     subplot_kw = dict(xlim=(0, 1), ylim=(0, 1), autoscale_on=False)
     fig, ax = plt.subplots(subplot_kw=subplot_kw)
 
     pts = ax.scatter(data[:, 0], data[:, 1], s=80)
     selector = SelectFromCollection(ax, pts, shape='Ellipse')
+    selector.roi.connect_event('roi_changed', roi_changed)
 
     plt.show()
     raw_input('Press any key to accept selected points')

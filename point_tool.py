@@ -60,6 +60,7 @@ class PointTool(CanvasToolBase):
         self.radius = radius
         self._artists = [self._point]
         self._position = 0, 0
+        self.shape = 'point'
 
         self.connect_event('button_press_event', self.on_mouse_press)
         self.connect_event('button_release_event', self.on_mouse_release)
@@ -102,6 +103,7 @@ class PointTool(CanvasToolBase):
         self._point.set_visible(True)
         self._point.center = (x, y)
         self._position = (x, y)
+        self.canvas.callbacks.process('roi_changed', self)
         self.redraw()
 
     @property
@@ -112,6 +114,13 @@ class PointTool(CanvasToolBase):
     def geometry(self, pt):
         x, y = pt
         self.update_point(x, y)
+
+    @property
+    def data(self):
+        if self.ax.images:
+            data = self.ax.images[0].get_array()
+            x, y = self._position
+            return data[y, x]
 
 
 if __name__ == '__main__':

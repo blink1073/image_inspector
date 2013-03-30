@@ -5,6 +5,7 @@ Created on Tue Mar  5 21:11:25 2013
 @author: silvester
 """
 import numpy as np
+from matplotlib.path import Path
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 import polygon_math
@@ -220,6 +221,7 @@ class SelectionTool(CanvasToolBase):
         elif shape.lower() == 'lasso':
             self.tool = self._lasso_tool
         self._marquee_tool.set_visible(False)
+        self.shape = shape
 
     @property
     def geometry(self):
@@ -244,6 +246,10 @@ class SelectionTool(CanvasToolBase):
         self.set_visible(False)
         self.modifiers = set()
 
+    @property
+    def data(self):
+        return self.tool.data
+
 
 class BaseSelector(CanvasToolBase):
 
@@ -253,6 +259,7 @@ class BaseSelector(CanvasToolBase):
         self.modifiers = set()
         self.finished = False
         self._prev_verts = None
+        self.shape = 'rectangle'
 
     def onmove(self, event):
         pass
@@ -281,14 +288,32 @@ class BaseSelector(CanvasToolBase):
     def cleanup(self):
         pass
 
+    @property
     def geometry(self):
         return self.verts
+
+    @property
+    def data(self):
+        path = Path(self.verts)
+        if self.ax.images:
+            data = self.ax.images[0].get_array()
+            x, y = np.meshgrid(np.arange(data.shape[1]),
+                               np.arange(data.shape[0]))
+            pts = np.vstack((x.ravel(), y.ravel())).T
+            ind = np.nonzero(path.contains_points(pts))[0]
+            return data.ravel()[ind]
+        elif self.ax.lines:
+            x, y = self.ax.lines[0].get_data()
+            pts = np.vstack((x, y)).T
+            ind = np.nonzero(path.contains_points(pts))[0]
+            return pts[ind]
 
 
 class LassoSelection(BaseSelector):
 
     def __init__(self, ax):
         BaseSelector.__init__(self, ax)
+        self.shape = 'lasso'
         self.mode = 'lasso'
         self._indicator = Rectangle((0, 0), 0, 0)
         self._indicator.set_visible(False)
@@ -311,7 +336,7 @@ class LassoSelection(BaseSelector):
 
     def onpress(self, event):
         if self._indicator.get_visible() or event.dblclick:
-            self.verts = self.verts[:-2]
+            self.verts = self.verts[:-1]
             self.finalize()
             return
         if not self.verts:
@@ -323,6 +348,7 @@ class LassoSelection(BaseSelector):
         self.verts.append(self.verts[0])
         self.finished = True
         self.active = False
+        self.canvas.callbacks.process('roi_changed', self)
 
     def cleanup(self):
         self.verts = None
@@ -460,6 +486,7 @@ class MarqeeSelection(BaseSelector):
     def onrelease(self, event):
         self._extents_on_press = None
         self.finalize()
+        self.canvas.callbacks.process('roi_changed', self)
 
     def onpress(self, event):
         self._set_active_handle(event)
@@ -546,7 +573,12 @@ if __name__ == '__main__':
     def print_geometry(geometry):
         print geometry
 
+    def roi_changed(roi):
+        print roi.shape, len(roi.geometry), type(roi.data)
+
     f, ax = plt.subplots()
     ax.imshow(image, interpolation='nearest')
-    tool = SelectionTool(ax, on_release=print_geometry)
+    #ax.plot(np.random.random(10))
+    tool = SelectionTool(ax, shape='lasso', on_release=print_geometry)
+    tool.connect_event('roi_changed', roi_changed)
     plt.show()
