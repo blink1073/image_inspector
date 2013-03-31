@@ -45,7 +45,7 @@ class PointTool(CanvasToolBase):
     label : int
         Current paint color.
     """
-    def __init__(self, ax, radius=5, alpha=0.3, on_move=None,
+    def __init__(self, ax, radius=2, alpha=0.3, on_move=None,
                  on_release=None, on_enter=None, rect_props=None):
         super(PointTool, self).__init__(ax, on_move=on_move, on_enter=on_enter,
                                         on_release=on_release)
@@ -58,7 +58,7 @@ class PointTool(CanvasToolBase):
         self.ax.add_patch(self._point)
 
         # `radius` can only be set after initializing `_point`
-        self.radius = radius
+        self._radius = radius
         self._artists = [self._point]
         self._position = 0, 0
         self.shape = 'point'
@@ -67,19 +67,21 @@ class PointTool(CanvasToolBase):
         self.connect_event('button_release_event', self.on_mouse_release)
 
     @property
-    def radius(self):
-        return self._radius
-
-    @radius.setter
-    def radius(self, r):
-        self._radius = r
-        dia = 2 * r
+    def radii(self):
+        dia = 2 * self._radius
         # translate to pixels
-        p1, p2 = self.ax.transData.inverted().transform([(0, 0), (dia, dia)])
-        wid = abs(p2[0] - p1[0])
-        hgt = abs(p2[1] - p1[1])
-        self._point.width = wid
-        self._point.height = hgt
+        # calculate asymmetry of x and y axes:
+        x0, y0 = self.ax.transAxes.transform((0, 0)) # lower left in pixels
+        x1, y1 = self.ax.transAxes.transform((1, 1)) # upper right in pixels
+        dx = x1 - x0
+        dy = abs(y1 - y0)
+        maxd = max(dx, dy)
+        x1, x2 = self.ax.get_xlim()
+        y1, y2 = self.ax.get_ylim()
+        y2 = max(y1, y2)
+        width =  maxd / dx * dia / 100. * x2
+        height = maxd / dy * dia / 100. * y2
+        return width, height
 
     def _on_key_press(self, event):
         if not self.active:
@@ -101,6 +103,7 @@ class PointTool(CanvasToolBase):
         self.callback_on_release(self.geometry)
 
     def update_point(self, x, y):
+        self._point.width, self._point.height = self.radii
         self._point.set_visible(True)
         self._point.center = (x, y)
         self._position = (x, y)
@@ -125,7 +128,11 @@ class PointTool(CanvasToolBase):
 
     @property
     def roi(self):
-        return ROI('point', self.data, self.geometry)
+        if self.ax.images:
+            source_type = 'image'
+        else:
+            source_type = 'xy'
+        return ROI('point', self.data, self.geometry, source_type=source_type)
 
 
 if __name__ == '__main__':

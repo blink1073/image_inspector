@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.ndimage as ndi
 
 try:
     from matplotlib import lines
@@ -131,7 +130,10 @@ class LineTool(CanvasToolBase):
 
     @property
     def geometry(self):
-        return self.end_points
+        pt1, pt2 = self.end_points
+        if pt1[0] > pt2[0]:
+            pt1, pt2 = pt2, pt1
+        return np.array((pt1, pt2))
 
     @geometry.setter
     def geometry(self, points):
@@ -149,10 +151,13 @@ class LineTool(CanvasToolBase):
 
     @property
     def roi(self):
-        geometry = self.geometry.tolist()
-        geometry.append(self.linewidth)
-        return ROI('line', self.data, geometry)
-
+        if self.ax.images:
+            source_type = 'image'
+        else:
+            source_type = 'xy'
+        return ROI('line', self.data, self.geometry,
+                   source_type=source_type,
+                   linewidth=self.linewidth)
 
 
 class ThickLineTool(LineTool):

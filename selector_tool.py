@@ -312,7 +312,12 @@ class BaseSelector(CanvasToolBase):
 
     @property
     def roi(self):
-        return ROI(self.shape, self.data, self.geometry)
+        if self.ax.images:
+            source_type = 'image'
+        else:
+            source_type = 'xy'
+        return ROI(self.shape, self.data, self.geometry,
+                   source_type=source_type)
 
 
 class LassoSelection(BaseSelector):

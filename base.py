@@ -1,5 +1,5 @@
 import numpy as np
-
+from skimage.viewer.canvastools
 try:
     from matplotlib import lines
 except ImportError:

@@ -11,18 +11,20 @@ from matplotlib.path import Path
 
 class ROI(object):
 
-    def __init__(self, shape, source_data, geometry):
+    def __init__(self, shape, source_data, geometry, source_type='image',
+                 **kwargs):
         self.shape = shape.lower()
         self.source_data = source_data
-        if self.shape != 'line':
-            self.geometry = geometry
-            self.linewidth = None
-        else:
-            self.geometry = geometry[:2]
-            self.linewidth = geometry[2]
+        self.source_type = source_type
+        self.geometry = geometry
+        if 'linewidth' in kwargs:
+            self.linewidth = kwargs['linewidth']
         self.data = self._get_data()
         self.extents = self._get_extents()
-        self.stats = compute_stats(self.data)
+        if source_type == 'xy' and not source_data is None:
+            self.stats = compute_stats(self.data[:, 1])
+        else:
+            self.stats = compute_stats(self.data)
         self.text = self._get_text()
 
     def _get_text(self):
@@ -45,6 +47,8 @@ class ROI(object):
         return text
 
     def _get_data(self):
+        if self.source_data is None:
+            return None
         if self.shape == 'line':
             return profile_line(self.source_data, self.geometry,
                                 self.linewidth)
@@ -72,10 +76,16 @@ class ROI(object):
             x, y = pt
             text = '{0}: ({1:.4G}, {2:.4G}), {3:.4G}, {4:.4G}'
             text = text.format(self.shape.capitalize(), x, y, wid, hgt)
-        elif self.shape == 'line':
+        elif self.shape == 'line' and not self.source_data is None:
             p1, p2 = self.geometry
-            text = 'Line: ({0:.4G}, {1:.4G}), ({2:.4G}, {3:.4G})'
-            text = text.format(p1[0], p1[1], p2[0], p2[1])
+            if p1[0] > p2[0]:
+                p1, p2 = p2, p1
+            dx = p2[0] - p1[0]
+            dy = p1[1] - p2[1]
+            dist = np.hypot(dx, dy)
+            angle = np.arctan2(dy, dx) * 180. / np.pi
+            text = 'Line: {0:.4G}, {1} deg, ({2:.4G}, {3:.4G})'
+            text = text.format(dist, int(angle), p1[0], p1[1])
         elif self.shape == 'point':
             x, y = self.geometry
             if self.data:
@@ -162,6 +172,8 @@ def mask_data(data, verts):
 
 
 def compute_stats(data):
+    if data is None or data.size == 1:
+        return
     real_data = data[np.isfinite(data)]
     results = dict()
     for calc in ['mean', 'std', 'min', 'max', 'sum', 'size']:
