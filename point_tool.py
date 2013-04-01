@@ -2,21 +2,17 @@ import numpy as np
 
 try:
     import matplotlib.pyplot as plt
-    import matplotlib.colors as mcolors
     from matplotlib.patches import Ellipse
-    LABELS_CMAP = mcolors.ListedColormap(['white', 'red', 'dodgerblue', 'gold',
-                                          'greenyellow', 'blueviolet'])
 except ImportError:
     print("Could not import matplotlib -- skimage.viewer not available.")
 
-from base import CanvasToolBase
-from roi import ROI
+from roi import ROIToolBase
 
 
 __all__ = ['PointTool']
 
 
-class PointTool(CanvasToolBase):
+class PointTool(ROIToolBase):
     """Widget for painting on top of a plot.
 
     Parameters
@@ -63,9 +59,6 @@ class PointTool(CanvasToolBase):
         self._position = 0, 0
         self.shape = 'point'
 
-        self.connect_event('button_press_event', self.on_mouse_press)
-        self.connect_event('button_release_event', self.on_mouse_release)
-
     @property
     def radii(self):
         dia = 2 * self._radius
@@ -96,18 +89,18 @@ class PointTool(CanvasToolBase):
         if not self.active:
             return
         self.update_point(event.xdata, event.ydata)
+        self.start(event)
 
     def on_mouse_release(self, event):
         if event.button != 1 or not self.active:
             return
-        self.callback_on_release(self.geometry)
+        self.finalize()
 
     def update_point(self, x, y):
         self._point.width, self._point.height = self.radii
         self._point.set_visible(True)
         self._point.center = (x, y)
         self._position = (x, y)
-        self.canvas.callbacks.process('roi_changed', self.roi)
         self.redraw()
 
     @property
@@ -125,14 +118,6 @@ class PointTool(CanvasToolBase):
             data = self.ax.images[0].get_array()
             x, y = self._position
             return data[y, x]
-
-    @property
-    def roi(self):
-        if self.ax.images:
-            source_type = 'image'
-        else:
-            source_type = 'xy'
-        return ROI('point', self.data, self.geometry, source_type=source_type)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 import numpy as np
-from skimage.viewer.canvastools
+
 try:
     from matplotlib import lines
 except ImportError:
@@ -48,6 +48,11 @@ class CanvasToolBase(object):
         self.callback_on_release = _pass if on_release is None else on_release
 
         self.connect_event('key_press_event', self._on_key_press)
+        self.connect_event('button_press_event', self._on_mouse_press)
+        self.connect_event('button_release_event', self._on_mouse_release)
+        self.connect_event('motion_notify_event', self._on_move)
+
+        self._busy = False
         self.activate()
 
     def activate(self):
@@ -115,10 +120,34 @@ class CanvasToolBase(object):
             self.canvas.draw_idle()
 
     def _on_key_press(self, event):
-        if event.key == 'enter':
+        if event.key == 'enter' and not self.ignore(event):
             self.callback_on_enter(self.geometry)
             self.set_visible(False)
             self.redraw()
+
+    def _on_mouse_press(self, event):
+        if not self.ignore(event):
+            self.on_mouse_press(event)
+
+    def on_mouse_press(self, event):
+        pass
+
+    def _on_mouse_release(self, event):
+        if not self.ignore(event):
+            self.on_mouse_release(event)
+            if not self._busy:
+                self.callback_on_release
+
+    def on_mouse_release(self, event):
+        pass
+
+    def _on_move(self, event):
+        if not self.ignore(event):
+            self.on_move(event)
+            self.callback_on_move(event)
+
+    def on_move(self, event):
+        pass
 
     @property
     def geometry(self):
