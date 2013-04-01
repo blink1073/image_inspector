@@ -14,26 +14,27 @@ from base import ToolHandles
 class PolygonToolBase(ROIToolBase):
 
     def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
-                                        line_props=None):
+                     useblit=True, line_props=None):
         super(PolygonToolBase, self).__init__(ax, on_move=on_move,
-                                            on_release=on_release,
-                                                on_enter=on_enter)
+                                on_enter=on_enter, on_release=on_release,
+                                useblit=useblit)
         self.verts = []
-
         self._timer = self.canvas.new_timer(interval=1000)
         self._timer.add_callback(self.on_timer)
         self._timer.start()
         self._timer_count = 0
 
     def on_timer(self):
-        if not self._line.get_visible():
+        if not self._line.get_visible() or self._prev_line.get_visible():
             return
         self._line.set_linestyle('--')
         self._timer_count += 1
         if self._timer_count % 2:
             self._line.set_dashes([4, 2, 6, 4])
+            self._prev_line.set_dashes([4, 3, 6, 4])
         else:
             self._line.set_dashes([4, 3, 6, 4])
+            self._prev_line.set_dashes([4, 2, 6, 4])
         self.redraw()
 
     def finalize(self):
@@ -69,10 +70,11 @@ class PolygonToolBase(ROIToolBase):
 class LassoSelection(PolygonToolBase):
 
     def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
-                                        line_props=None):
+                     useblit=True, line_props=None):
         super(LassoSelection, self).__init__(ax, on_move=on_move,
                                             on_release=on_release,
                                                 on_enter=on_enter,
+                                                useblit=useblit,
                                                 line_props=line_props)
         self.shape = 'lasso'
         self.mode = 'lasso'
@@ -165,10 +167,12 @@ class LassoSelection(PolygonToolBase):
 class RectangleSelection(PolygonToolBase):
 
     def __init__(self, ax, maxdist=10, on_move=None,
-                 on_release=None, on_enter=None, line_props=None):
+                 on_release=None, on_enter=None, useblit=True,
+                 line_props=None):
         super(RectangleSelection, self).__init__(ax, on_move=on_move,
                                             on_release=on_release,
                                                 on_enter=on_enter,
+                                                useblit=useblit,
                                                 line_props=line_props)
         self.anchor = None
         self.origin = None
@@ -212,7 +216,7 @@ class RectangleSelection(PolygonToolBase):
             self.modifiers.remove(event.key)
 
     def on_move(self, event):
-        if not self._busy:
+        if not self._busy or not event.xdata:
             return
         if self.active_handle and not self.active_handle == 'C':
             x1, x2, y1, y2 = self._extents_on_press
@@ -362,10 +366,12 @@ class RectangleSelection(PolygonToolBase):
 class EllipseSelection(RectangleSelection):
 
     def __init__(self, ax, maxdist=10, on_move=None,
-                 on_release=None, on_enter=None, line_props=None):
+                 on_release=None, on_enter=None, useblit=True,
+                 line_props=None):
         super(EllipseSelection, self).__init__(ax, on_move=on_move,
                                             on_release=on_release,
                                                 on_enter=on_enter,
+                                                maxdist=maxdist, useblit=True,
                                                 line_props=line_props)
         self.shape = 'ellipse'
 

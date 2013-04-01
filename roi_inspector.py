@@ -35,7 +35,7 @@ class ROIPlotter(object):
                 self.draw_histogram(data)
             elif self.mode == 'boxplot':
                 self.ax.boxplot(data, 0, 'rs', 0)
-                self.ax.autoscale_view(tight=True)
+            self.ax.autoscale_view(tight=True)
             self.canvas.draw_idle()
         elif roi.shape == 'line' and not roi.data is None:
             self.draw_line_profile(roi.data)

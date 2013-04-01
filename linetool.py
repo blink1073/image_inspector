@@ -32,11 +32,10 @@ class LineTool(ROIToolBase):
     end_points : 2D array
         End points of line ((x1, y1), (x2, y2)).
     """
-    def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
-                 maxdist=10, line_props=None):
+    def __init__(self, ax, on_move=None, on_enter=None, on_release=None,
+                 useblit=True, maxdist=10, line_props=None):
         super(LineTool, self).__init__(ax, on_move=on_move, on_enter=on_enter,
-                                       on_release=on_release,
-                                       line_props=line_props)
+                                       on_release=on_release, useblit=useblit)
         if not line_props:
             line_props = dict()
         self.linewidth = line_props.get('linewidth', 1)
@@ -50,7 +49,7 @@ class LineTool(ROIToolBase):
 
         self._handles = ToolHandles(ax, x, y)
         self._handles.set_visible(False)
-        self._artists.append(self._handles.artist)
+        self._artists = [self._line, self._handles.artist]
 
         if on_enter is None:
             def on_enter(pts):
@@ -129,7 +128,8 @@ class LineTool(ROIToolBase):
 
     def activate(self):
         self.active = True
-        self.set_visible(True)
+        if hasattr(self, '_prev_line'):
+            self._prev_line.set_data([], [])
         self.redraw()
 
     @property

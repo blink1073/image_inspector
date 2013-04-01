@@ -41,14 +41,13 @@ class PointTool(ROIToolBase):
     label : int
         Current paint color.
     """
-    def __init__(self, ax, radius=2, alpha=0.3, on_move=None,
-                 on_release=None, on_enter=None, rect_props=None):
+    def __init__(self, ax, radius=2, on_move=None,
+                 on_release=None, on_enter=None, useblit=True,
+                 shape_props=None):
         super(PointTool, self).__init__(ax, on_move=on_move, on_enter=on_enter,
-                                        on_release=on_release)
-
+                                        on_release=on_release, useblit=useblit)
         props = dict(edgecolor='r', facecolor='0.7', alpha=0.5, animated=True)
-        props.update(rect_props if rect_props is not None else {})
-
+        props.update(shape_props if shape_props is not None else {})
         self._point = Ellipse((0, 0), 0, 0, **props)
         self._point.set_visible(False)
         self.ax.add_patch(self._point)

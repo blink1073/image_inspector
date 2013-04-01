@@ -41,9 +41,10 @@ class SelectionTool(CanvasToolBase):
         (x, y) points definining the shape.
     """
     def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
-                 maxdist=10, lineprops=None, shape='rectangle'):
+                 maxdist=10, useblit=True, lineprops=None, shape='rectangle'):
         super(SelectionTool, self).__init__(ax, on_move=on_move,
-                                on_enter=on_enter, on_release=on_release)
+                                on_enter=on_enter, on_release=on_release,
+                                useblit=useblit)
 
         if on_enter is None:
             def on_enter(vertices):
@@ -59,6 +60,7 @@ class SelectionTool(CanvasToolBase):
         self.modifiers = set()
         self._prev_modifiers = set()
         self._recurse = False
+        self.active = False
 
         self.tools = [LassoSelection(ax),
                       RectangleSelection(ax, maxdist=maxdist),
@@ -134,8 +136,10 @@ class SelectionTool(CanvasToolBase):
             if tool.shape == shape:
                 tool.activate()
                 self.tool = tool
-                self.tool.verts = self.verts
-                self.tool.update()
+                if self.verts:
+                    self.tool._prev_line.set_data(zip(*self.verts))
+                    self.tool._prev_line.set_visible(True)
+                    self.tool.redraw()
             else:
                 tool.deactivate()
 
@@ -144,18 +148,18 @@ class SelectionTool(CanvasToolBase):
         return self.tool.verts
 
     def activate(self):
-        self.active = True
-        self.redraw()
         self.modifiers = set()
         if hasattr(self, 'tool'):
             self.tool.activate()
+        self.redraw()
 
     def deactivate(self):
-        self.active = False
         for tool in self.tools:
             tool.deactivate()
         self.set_visible(False)
         self.modifiers = set()
+        self.verts = None
+        self.redraw()
 
 
 if __name__ == '__main__':

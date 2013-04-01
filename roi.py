@@ -12,11 +12,11 @@ from base import CanvasToolBase
 
 class ROIToolBase(CanvasToolBase):
 
-    def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
-                 maxdist=10, line_props=None):
+    def __init__(self, ax, on_move=None, on_enter=None, on_release=None,
+                                            useblit=True, line_props=None):
         super(ROIToolBase, self).__init__(ax, on_move=on_move,
                                         on_enter=on_enter,
-                                       on_release=on_release)
+                                        on_release=on_release, useblit=useblit)
         self.shape = 'none'
         props = dict(color='r', linewidth=1, solid_capstyle='butt')
         props.update(line_props if line_props is not None else {})
@@ -77,7 +77,7 @@ class ROIToolBase(CanvasToolBase):
 
 class ROI(object):
 
-    def __init__(self, shape, data, geometry, source_type, **kwargs):
+    def __init__(self, shape, data, geometry, source_type):
         self.shape = shape.lower()
         self.geometry = geometry
         self.data = data

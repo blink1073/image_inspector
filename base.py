@@ -61,7 +61,7 @@ class CanvasToolBase(object):
     def deactivate(self):
         self.active = False
         self.set_visible(False)
-        self.ax.figure.canvas.draw_idle()
+        self.redraw()
 
     def connect_event(self, event, callback):
         """Connect callback with an event.
@@ -90,6 +90,8 @@ class CanvasToolBase(object):
             artist.set_visible(val)
 
     def _blit_on_draw_event(self, event=None):
+        if event and self.ignore(event):
+            return
         self.img_background = self.canvas.copy_from_bbox(self.ax.bbox)
         self._draw_artists()
 
