@@ -19,6 +19,8 @@ class ROIPlotter(object):
         self._line = None
 
     def roi_changed(self, roi):
+        if roi.handled:
+            return
         self.twin_ax.clear()
         self.twin_ax.get_yaxis().set_visible(False)
         if roi.shape.lower() in ['lasso', 'rectangle', 'ellipse']:
@@ -37,6 +39,7 @@ class ROIPlotter(object):
             self.canvas.draw_idle()
         elif roi.shape == 'line' and not roi.data is None:
             self.draw_line_profile(roi.data)
+        print roi.stat_text
 
     def draw_histogram(self, data):
         nbins = min(100, np.sqrt(data.size))

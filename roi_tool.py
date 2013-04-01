@@ -20,13 +20,12 @@ class ROITool(CanvasToolBase):
                  useblit=True):
         CanvasToolBase.__init__(self, ax, on_move=on_move, on_enter=on_enter,
                             on_release=on_release, useblit=useblit)
-        self.selector = SelectionTool(ax, on_finish=on_release,
+        self.selector = SelectionTool(ax, on_release=on_release,
                                       shape='rectangle')
         self.line = ThickLineTool(ax, on_release=on_release)
         self.point = PointTool(ax, on_release=on_release)
         self.tools = [self.line, self.point, self.selector]
-        self.connect_event('set_roi', self.set_roi)
-        self.set_shape(shape)
+        self.shape = shape
 
     def _on_key_press(self, event):
         if event.key == 'ctrl+p':
@@ -45,43 +44,23 @@ class ROITool(CanvasToolBase):
         self._active_tool = tool
         self.redraw()
 
-    def set_shape(self, shape='Rectangle'):
+    @property
+    def shape(self):
+        return self.tool.shape
+
+    @shape.setter
+    def shape(self, shape):
         if shape.lower() in ['rectangle', 'ellipse', 'lasso']:
             self.activate_tool(self.selector)
-            self.selector.set_shape(shape)
+            self.selector.shape = shape
         elif shape.lower() == 'line':
             self.activate_tool(self.line)
         elif shape.lower() == 'point':
             self.activate_tool(self.point)
-        self.shape = shape
 
     @property
     def geometry(self):
         return self._active_tool.geometry
-
-    @geometry.setter
-    def geometry(self, pts):
-        if len(pts) == 1:
-            self.set_shape('point')
-        elif len(pts) == 2:
-            self.set_shape('line')
-        else:
-            self.set_shape('lasso')
-        self._active_tool.geometry = np.array(pts)
-
-    @property
-    def data(self):
-        return self._active_tool.data
-
-    @property
-    def roi(self):
-        return self._active_tool.roi
-
-    def set_roi(self, shape, geometry, linewidth=None):
-        self.set_shape(shape)
-        self.geometry = geometry
-        if linewidth:
-            self._active_tool.linewidth = linewidth
 
 
 class SelectFromCollection(object):

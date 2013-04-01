@@ -6,10 +6,27 @@ Created on Sat Mar 30 09:29:50 2013
 """
 import numpy as np
 from matplotlib.path import Path
+from matplotlib.lines import Line2D
 from base import CanvasToolBase
 
 
 class ROIToolBase(CanvasToolBase):
+
+    def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
+                 maxdist=10, line_props=None):
+        super(ROIToolBase, self).__init__(ax, on_move=on_move,
+                                        on_enter=on_enter,
+                                       on_release=on_release)
+        self.shape = 'none'
+        props = dict(color='r', linewidth=1, solid_capstyle='butt')
+        props.update(line_props if line_props is not None else {})
+        self._line = Line2D([], [], visible=False, animated=True, **props)
+        self._prev_line = Line2D([], [], visible=False, animated=True,
+                                 **props)
+        self.verts = None
+        ax.add_line(self._line)
+        ax.add_line(self._prev_line)
+        self._artists = [self._line, self._prev_line]
 
     def start(self, event):
         self._busy = True
@@ -17,14 +34,28 @@ class ROIToolBase(CanvasToolBase):
     def finalize(self):
         self._busy = False
         self.publish_roi()
+        if self.verts:
+            self._prev_line.set_data(zip(*self.verts))
+            self._prev_line.set_visible(False)
+        self.update()
 
     @property
     def source_data(self):
         if self.ax.images:
             return self.ax.images[0].get_array()
+        elif self.ax.collections:
+            xy = self.ax.collections[0].get_offsets()
+            return xy[:, 0], xy[:, 1]
         elif self.ax.lines:
             x, y = self.ax.lines[0].get_data()
             return x, y
+
+    def update(self):
+        if not self.verts:
+            return
+        self._line.set_data(zip(*self.verts))
+        self._line.set_visible(True)
+        self.redraw()
 
     @property
     def roi(self):
@@ -50,11 +81,13 @@ class ROI(object):
         self.shape = shape.lower()
         self.geometry = geometry
         self.data = data
+        self.source_type = source_type
         if source_type == 'xy' and not data is None:
             self.stats = compute_stats(data[:, 1])
         elif not data is None:
             self.stats = compute_stats(data)
         self.stat_text = self._get_stat_text()
+        self.handled = False
 
     def _get_stat_text(self):
         text = str(self) + '\n'

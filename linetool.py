@@ -1,11 +1,6 @@
 import numpy as np
 import scipy.ndimage as ndi
 
-try:
-    from matplotlib import lines
-except ImportError:
-    print("Could not import matplotlib -- skimage.viewer not available.")
-
 from base import ToolHandles
 from roi import ROIToolBase
 
@@ -40,26 +35,22 @@ class LineTool(ROIToolBase):
     def __init__(self, ax, on_move=None, on_release=None, on_enter=None,
                  maxdist=10, line_props=None):
         super(LineTool, self).__init__(ax, on_move=on_move, on_enter=on_enter,
-                                       on_release=on_release)
-
-        props = dict(color='r', linewidth=1, alpha=0.4, solid_capstyle='butt')
-        props.update(line_props if line_props is not None else {})
-        self.linewidth = props['linewidth']
+                                       on_release=on_release,
+                                       line_props=line_props)
+        if not line_props:
+            line_props = dict()
+        self.linewidth = line_props.get('linewidth', 1)
         self.shape = 'line'
         self.maxdist = maxdist
         self._active_pt = None
-        self.activate()
 
         x = (0, 0, 0)
         y = (0, 0, 0)
         self._end_pts = np.transpose([x, y])
 
-        self._line = lines.Line2D(x, y, visible=False, animated=True, **props)
-        ax.add_line(self._line)
-
         self._handles = ToolHandles(ax, x, y)
         self._handles.set_visible(False)
-        self._artists = [self._line, self._handles.artist]
+        self._artists.append(self._handles.artist)
 
         if on_enter is None:
             def on_enter(pts):
@@ -143,8 +134,9 @@ class LineTool(ROIToolBase):
 
     @property
     def data(self):
-        source_data = self.source_data
-        return profile_line(self.source_data, self.end_points, self.linewidth)
+        if self.ax.images:
+            return profile_line(self.source_data, self.end_points,
+                                self.linewidth)
 
 
 class ThickLineTool(LineTool):

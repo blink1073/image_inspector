@@ -5,7 +5,6 @@ Created on Sun Mar 31 14:45:18 2013
 @author: silvester
 """
 import numpy as np
-from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from matplotlib.patches import Path
 from roi import ROIToolBase
@@ -20,26 +19,29 @@ class PolygonToolBase(ROIToolBase):
                                             on_release=on_release,
                                                 on_enter=on_enter)
         self.verts = []
-        props = dict(color='r', linewidth=1, alpha=1, solid_capstyle='butt',
-                     linestyle='--')
-        props.update(line_props if line_props is not None else {})
-        self._line = Line2D([], [], visible=False, animated=True,
-                                  **props)
-        ax.add_line(self._line)
-        self._artists = [self._line]
+
+        self._timer = self.canvas.new_timer(interval=1000)
+        self._timer.add_callback(self.on_timer)
+        self._timer.start()
+        self._timer_count = 0
+
+    def on_timer(self):
+        if not self._line.get_visible():
+            return
+        self._line.set_linestyle('--')
+        self._timer_count += 1
+        if self._timer_count % 2:
+            self._line.set_dashes([4, 2, 6, 4])
+        else:
+            self._line.set_dashes([4, 3, 6, 4])
+        self.redraw()
 
     def finalize(self):
         super(PolygonToolBase, self).finalize()
-        self.update()
 
     def start(self, event):
         super(PolygonToolBase, self).start(event)
         self.verts = [(event.xdata, event.ydata)]
-
-    def update(self):
-        self._line.set_data(zip(*self.verts))
-        self._line.set_visible(True)
-        self.redraw()
 
     @property
     def data(self):
@@ -47,6 +49,8 @@ class PolygonToolBase(ROIToolBase):
         source_data = self.source_data
         if isinstance(source_data, tuple):
             x, y = source_data
+            if not x:
+                return
             pts = np.vstack((x, y)).T
             ind = np.nonzero(path.contains_points(pts))[0]
             return pts[ind]
@@ -95,7 +99,10 @@ class LassoSelection(PolygonToolBase):
             else:
                 self.verts.append((event.xdata, event.ydata))
             self._prev_angle = theta
-        self._show_indicator()
+        try:
+            self._show_indicator()
+        except TypeError:
+            pass
         self.update()
 
     def on_mouse_release(self, event):
@@ -118,8 +125,8 @@ class LassoSelection(PolygonToolBase):
 
     def finalize(self):
         self.verts.append(self.verts[0])
-        super(LassoSelection, self).finalize()
         self._indicator.set_visible(False)
+        super(LassoSelection, self).finalize()
 
     def _show_indicator(self):
         if not self.verts:
@@ -194,7 +201,7 @@ class RectangleSelection(PolygonToolBase):
         self.origin_pix = (event.x, event.y)
         if not self.active_handle == 'C':
             self.extents = [0, 0, 0, 0]
-        self.set_visible(True)
+        self._line.set_visible(True)
 
     def on_key(self, event):
         if self._busy:
