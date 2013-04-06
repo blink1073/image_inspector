@@ -68,7 +68,7 @@ class ROIToolBase(CanvasToolBase):
 
     def publish_roi(self):
         if not self.geometry is None:
-            self.canvas.callbacks.process('roi_changed', self.roi)
+            self.process_custom_event('roi_changed', self.roi)
 
     @property
     def data(self):
@@ -104,7 +104,7 @@ class ROI(object):
                     right_stat = float(self.stats[right])
                 except Exception:
                     return
-                line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
+                line = '{0:>8} | {1:>8.3G}   || {2:>8} | {3:>8.3G}\n'
                 text += line.format(left, left_stat, right, right_stat)
         return text
 

@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Apr 06 14:59:45 2013
+
+@author: User
+"""
+import enaml.qt.qt
+from enaml.widgets.api import *
+from enaml.layout.api import *
+from enaml.application import timed_call
+
+import matplotlib
+matplotlib.use('Qt4Agg', False)
+import matplotlib.pyplot as plt
+from skimage import data
+from roi_tool import ROITool
+from roi_inspector import ROIPlotter
+
+
+image = data.camera()
+
+def print_geometry(geometry):
+    print geometry
+
+def roi_changed(roi):
+    print roi.shape, len(roi.geometry), type(roi.data)
+
+fig1 = plt.figure()
+ax1 = fig1.gca()
+ax1.imshow(image, interpolation='nearest')
+#ax1.plot(np.random.random(1000))
+
+fig2 = plt.figure()
+ax2 = fig2.gca()
+tool = ROITool(ax1, shape='line', on_release=print_geometry)
+inspector = ROIPlotter(ax2)
+
+
+enamldef Main(MainWindow):
+    event update
+    initialized ::
+        update()
+    update ::
+        roi_text.text = inspector.stat_text
+        timed_call(500, update)
+    Container:
+        constraints = [hbox(canvas1, vbox(canvas2, roi_text)), canvas2.height == roi_text.height * 2]
+        MPLCanvas: canvas1:
+            figure = fig1
+        MPLCanvas: canvas2:
+            figure = fig2
+        MultilineField: roi_text:
+            font = 'courier'

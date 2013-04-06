@@ -7,7 +7,7 @@ Created on Wed Mar 27 20:07:11 2013
 import numpy as np
 from matplotlib.path import Path
 
-from base import CanvasToolBase
+from base import CanvasToolBase, callback_registry
 from selector_tool import SelectionTool
 from linetool import ThickLineTool
 from point_tool import PointTool
@@ -26,6 +26,13 @@ class ROITool(CanvasToolBase):
         self.point = PointTool(ax, on_release=on_release)
         self.tools = [self.line, self.point, self.selector]
         self.shape = shape
+        self.connect_event('roi_force', self.roi_force)
+        
+    def roi_force(self, roi):
+        '''React to an roi setter'''
+        # TODO: implement this
+        import pdb; pdb.set_trace()
+        pass
 
     def _on_key_press(self, event):
         if event.key == 'ctrl+p':

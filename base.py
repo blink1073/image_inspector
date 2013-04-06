@@ -1,5 +1,6 @@
 import numpy as np
-
+import matplotlib
+matplotlib.use('Qt4Agg', False)
 try:
     from matplotlib import lines
 except ImportError:
@@ -11,6 +12,11 @@ __all__ = ['CanvasToolBase', 'ToolHandles']
 
 def _pass(*args):
     pass
+
+from matplotlib.cbook import CallbackRegistry
+
+
+callback_registry = CallbackRegistry()
 
 
 class CanvasToolBase(object):
@@ -36,7 +42,8 @@ class CanvasToolBase(object):
         self.ax = ax
         self.canvas = ax.figure.canvas
         self.img_background = None
-        self.cids = []
+        self.canvas_cids = []
+        self.custom_cids = []
         self._artists = []
 
         if useblit:
@@ -70,12 +77,25 @@ class CanvasToolBase(object):
         function stores call back ids for later clean up.
         """
         cid = self.canvas.mpl_connect(event, callback)
-        self.cids.append(cid)
+        self.canvas_cids.append(cid)
 
     def disconnect_events(self):
         """Disconnect all events created by this widget."""
-        for c in self.cids:
+        for c in self.canvas_cids:
             self.canvas.mpl_disconnect(c)
+        for c in self.canvas_cids:
+            callback_registry.disconnect(c)   
+            
+    def connect_custom_event(self, event, callback):
+        """Connect callback with an event that is not canvas specific.
+        """
+        print 'custom connect', event
+        cid = callback_registry.connect(event, callback)
+        self.custom_cids.append(cid)
+            
+    def process_custom_event(self, event, *args, **kwargs):
+        '''Process a custom event'''
+        callback_registry.process(event, *args, **kwargs)
 
     def ignore(self, event):
         """Return True if event should be ignored.

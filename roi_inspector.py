@@ -5,18 +5,18 @@ Created on Sat Mar 30 09:29:50 2013
 @author: silvester
 """
 import numpy as np
+from base import CanvasToolBase
 
 
-class ROIPlotter(object):
+class ROIPlotter(CanvasToolBase):
 
-    def __init__(self, plot_ax, use_blit=True):
-        self.ax = plot_ax
-        self.canvas = self.ax.figure.canvas
-        self.useblit = use_blit
-        self.twin_ax = plot_ax.twinx()
-        self.canvas.mpl_connect('roi_changed', self.roi_changed)
+    def __init__(self, ax, use_blit=True):
+        super(ROIPlotter, self).__init__(ax, useblit=use_blit)
+        self.twin_ax = ax.twinx()
+        self.connect_custom_event('roi_changed', self.roi_changed)
         self.mode = 'histogram'
         self._line = None
+        self.stat_text = ''
 
     def roi_changed(self, roi):
         if roi.handled:
@@ -39,7 +39,7 @@ class ROIPlotter(object):
             self.canvas.draw_idle()
         elif roi.shape == 'line' and not roi.data is None:
             self.draw_line_profile(roi.data)
-        print roi.stat_text
+        self.stat_text = roi.stat_text
 
     def draw_histogram(self, data):
         nbins = min(100, np.sqrt(data.size))
