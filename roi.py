@@ -104,7 +104,7 @@ class ROI(object):
                     right_stat = float(self.stats[right])
                 except Exception:
                     return
-                line = '{0:>8} | {1:>8.3G}   || {2:>8} | {3:>8.3G}\n'
+                line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
                 text += line.format(left, left_stat, right, right_stat)
         return text
 

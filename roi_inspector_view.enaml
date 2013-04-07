@@ -33,21 +33,32 @@ ax1.imshow(image, interpolation='nearest')
 fig2 = plt.figure()
 ax2 = fig2.gca()
 tool = ROITool(ax1, shape='line', on_release=print_geometry)
-inspector = ROIPlotter(ax2)
 
 
-enamldef Main(MainWindow):
+enamldef ROIPanel(Container): roi_panel:
+    attr figure
+    attr inspector
     event update
+    constraints = [vbox(canvas, roi_text), 
+                       canvas.height == roi_text.height * 2]
     initialized ::
         update()
     update ::
-        roi_text.text = inspector.stat_text
-        timed_call(500, update)
+        text = roi_panel.inspector.stat_text
+        if text:
+            roi_text.text = text
+        timed_call(100, update)
+    MPLCanvas: canvas:
+        figure = roi_panel.figure
+    MultilineField: roi_text:
+        font = 'mono 11'
+
+
+enamldef Main(MainWindow):
     Container:
-        constraints = [hbox(canvas1, vbox(canvas2, roi_text)), canvas2.height == roi_text.height * 2]
-        MPLCanvas: canvas1:
+        constraints = [hbox(canvas, roi_panel)]
+        MPLCanvas: canvas:
             figure = fig1
-        MPLCanvas: canvas2:
+        ROIPanel: roi_panel:
             figure = fig2
-        MultilineField: roi_text:
-            font = 'courier'
+            inspector = ROIPlotter(ax2)

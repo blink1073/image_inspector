@@ -53,7 +53,7 @@ class SelectionTool(CanvasToolBase):
 
         self.connect_event('key_press_event', self.onkey)
         self.connect_event('key_release_event', self.offkey)
-        self.connect_event('roi_changed', self.on_change)
+        self.connect_custom_event('roi_changed', self.on_change)
 
         self.mode = 'New'
         self.verts = None

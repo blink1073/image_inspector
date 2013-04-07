@@ -7,7 +7,7 @@ Created on Wed Mar 27 20:07:11 2013
 import numpy as np
 from matplotlib.path import Path
 
-from base import CanvasToolBase, callback_registry
+from base import CanvasToolBase
 from selector_tool import SelectionTool
 from linetool import ThickLineTool
 from point_tool import PointTool

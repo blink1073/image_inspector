@@ -249,10 +249,12 @@ class RectangleSelection(PolygonToolBase):
                 # square command
                 dx_pix = abs(event.x - self.origin_pix[0])
                 dy_pix = abs(event.y - self.origin_pix[1])
+                if not dx_pix:
+                    return
                 maxd = max(abs(dx_pix), abs(dy_pix))
                 if abs(dx_pix) < maxd:
                     dx *= maxd / abs(dx_pix)
-                if abs(dy_pix) < max:
+                if abs(dy_pix) < maxd:
                     dy *= maxd / abs(dy_pix)
             if 'control' in self.modifiers or 'ctrl+shift' in self.modifiers:
                 # from center
