@@ -53,7 +53,7 @@ class ROITool(CanvasToolBase):
 
     @property
     def shape(self):
-        return self.tool.shape
+        return self._active_tool.shape
 
     @shape.setter
     def shape(self, shape):

@@ -38,6 +38,18 @@ class ROIToolBase(CanvasToolBase):
             self._prev_line.set_data(zip(*self.verts))
             self._prev_line.set_visible(False)
         self.update()
+        
+    def ignore(self, event):
+        """Return True if event should be ignored.
+
+        This method (or a version of it) should be called at the beginning
+        of any event callback.
+        """
+        if self.canvas.toolbar and self.canvas.toolbar.mode:
+            return True
+        if hasattr(event, 'button') and event.button == 3:
+            return True
+        return not self.active
 
     @property
     def source_data(self):

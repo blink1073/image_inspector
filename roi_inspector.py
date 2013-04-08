@@ -42,6 +42,8 @@ class ROIPlotter(CanvasToolBase):
         self.stat_text = roi.stat_text
 
     def draw_histogram(self, data):
+        if not data.size:
+            return
         nbins = min(100, np.sqrt(data.size))
         nbins = max(10, nbins)
         self.ax.hist(data, bins=nbins, histtype='stepfilled')

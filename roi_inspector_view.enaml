@@ -8,6 +8,7 @@ import enaml.qt.qt
 from enaml.widgets.api import *
 from enaml.layout.api import *
 from enaml.application import timed_call
+import numpy as np
 
 import matplotlib
 matplotlib.use('Qt4Agg', False)
@@ -17,33 +18,43 @@ from roi_tool import ROITool
 from roi_inspector import ROIPlotter
 
 
-image = data.camera()
-
 def print_geometry(geometry):
     print geometry
 
 def roi_changed(roi):
     print roi.shape, len(roi.geometry), type(roi.data)
 
+
 fig1 = plt.figure()
 ax1 = fig1.gca()
-ax1.imshow(image, interpolation='nearest')
+ax1.imshow(data.camera(), interpolation='nearest')
 #ax1.plot(np.random.random(1000))
-
-fig2 = plt.figure()
-ax2 = fig2.gca()
 tool = ROITool(ax1, shape='line', on_release=print_geometry)
+    
 
+def get_roi_figure():
+    fig = plt.figure()
+    fig.set_tight_layout(True)
+    return fig
+    
+    
+enamldef ROIDock(DockPane): roi_dock:
+    title = 'ROI Inspector'
+    dock_area = 'right'
+    ROIPanel: roi_panel:
+        pass
+        
 
 enamldef ROIPanel(Container): roi_panel:
-    attr figure
-    attr inspector
+    attr figure = get_roi_figure()
+    attr inspector = ROIPlotter(figure.gca())
     event update
     constraints = [vbox(canvas, roi_text), 
                        canvas.height == roi_text.height * 2]
     initialized ::
         update()
     update ::
+        dummy = roi_panel.figure
         text = roi_panel.inspector.stat_text
         if text:
             roi_text.text = text
@@ -54,11 +65,11 @@ enamldef ROIPanel(Container): roi_panel:
         font = 'mono 11'
 
 
+
 enamldef Main(MainWindow):
     Container:
         constraints = [hbox(canvas, roi_panel)]
         MPLCanvas: canvas:
             figure = fig1
         ROIPanel: roi_panel:
-            figure = fig2
-            inspector = ROIPlotter(ax2)
+            pass
