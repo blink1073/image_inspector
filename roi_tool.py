@@ -31,9 +31,16 @@ class ROITool(CanvasToolBase):
     def roi_force(self, roi):
         '''React to an roi setter'''
         # TODO: implement this
-        import pdb; pdb.set_trace()
-        pass
-
+        if not roi:
+            return
+        if len(roi) == 4:
+            self.shape = 'rectangle'
+            self._active_tool.tool.extents = roi
+        elif len(roi) == 2:
+            self.shape = 'point'
+            self._active_tool.tool.geometry = roi
+            
+            
     def _on_key_press(self, event):
         if event.key == 'ctrl+p':
             self.activate_tool(self.point)

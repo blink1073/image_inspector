@@ -27,7 +27,10 @@ class ROIPlotter(CanvasToolBase):
             self.ax.clear()
             data = roi.data
             if roi.source_type == 'xy':
-                data = data[:, 1]
+                try:
+                    data = data[:, 1]
+                except Exception:
+                    return
             if isinstance(data, tuple):
                 # TODO: use a color histogram
                 pass

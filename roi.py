@@ -59,8 +59,11 @@ class ROIToolBase(CanvasToolBase):
             xy = self.ax.collections[0].get_offsets()
             return xy[:, 0], xy[:, 1]
         elif self.ax.lines:
-            x, y = self.ax.lines[0].get_data()
-            return x, y
+            for line in self.ax.lines:
+                x, y = line.get_data()
+                if isinstance(x, np.ndarray) and x.size > 4:
+                    return x, y
+            return None, None
 
     def update(self):
         if not self.verts:

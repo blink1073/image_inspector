@@ -50,7 +50,7 @@ class PolygonToolBase(ROIToolBase):
         source_data = self.source_data
         if isinstance(source_data, tuple):
             x, y = source_data
-            if not x:
+            if x is None:
                 return
             pts = np.vstack((x, y)).T
             ind = np.nonzero(path.contains_points(pts))[0]
