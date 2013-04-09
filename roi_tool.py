@@ -38,7 +38,7 @@ class ROITool(CanvasToolBase):
             self._active_tool.tool.extents = roi
         elif len(roi) == 2:
             self.shape = 'point'
-            self._active_tool.tool.geometry = roi
+            self._active_tool.geometry = roi
             
             
     def _on_key_press(self, event):
