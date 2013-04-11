@@ -146,9 +146,9 @@ class ROI(object):
             text = text.format(dist, int(angle), p1[0], p1[1])
         elif self.shape == 'point':
             x, y = self.geometry
-            if self.data:
+            if not self.data is None:
                 text = 'Point: {0:.4G} @ ({1:.4G}, {2:.4G})'
-                text = text.format(self.data, x, y)
+                text = text.format(self.data[5, 5], x, y)
             else:
                 text = 'Point: ({0:.4G}, {1:.4G})'.format(x, y)
         else:

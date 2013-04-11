@@ -116,7 +116,7 @@ class PointTool(ROIToolBase):
         if self.ax.images:
             data = self.ax.images[0].get_array()
             x, y = self._position
-            return data[y, x]
+            return data[y - 5: y + 6, x - 5: x + 6]
 
 
 if __name__ == '__main__':

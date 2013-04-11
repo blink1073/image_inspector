@@ -13,16 +13,27 @@ class ROIPlotter(CanvasToolBase):
     def __init__(self, ax, use_blit=True):
         super(ROIPlotter, self).__init__(ax, useblit=use_blit)
         self.twin_ax = ax.twinx()
+        self.ax.figure.sca(self.ax)
         self.connect_custom_event('roi_changed', self.roi_changed)
         self.mode = 'histogram'
         self._line = None
         self.stat_text = ''
+        self.data = None
+        self.colorbar = None
+        self.busy = False
 
     def roi_changed(self, roi):
         if roi.handled:
             return
+        if self.busy:
+            return
+        self.busy = True
         self.twin_ax.clear()
         self.twin_ax.get_yaxis().set_visible(False)
+        if self.colorbar and not roi.shape.lower() == 'point':
+            self.reset_figure()
+            if roi.shape.lower == 'line':
+                return
         if roi.shape.lower() in ['lasso', 'rectangle', 'ellipse']:
             self.ax.clear()
             data = roi.data
@@ -30,6 +41,7 @@ class ROIPlotter(CanvasToolBase):
                 try:
                     data = data[:, 1]
                 except Exception:
+                    self.busy = False
                     return
             if isinstance(data, tuple):
                 # TODO: use a color histogram
@@ -42,8 +54,30 @@ class ROIPlotter(CanvasToolBase):
             self.canvas.draw_idle()
         elif roi.shape == 'line' and not roi.data is None:
             self.draw_line_profile(roi.data)
+        elif roi.shape == 'point' and not roi.data is None:
+            self.ax.clear()
+            im = self.ax.imshow(roi.data, interpolation='nearest', picker=True)
+            if not self.colorbar:
+                self.colorbar = self.ax.figure.colorbar(im)
+            else:
+                self.colorbar.set_clim(vmin=roi.data.min(), vmax=roi.data.max())
+                self.colorbar.draw_all()
+            self.canvas.draw_idle()
         self.stat_text = roi.stat_text
-
+        self.data = roi.data
+        self.busy = False
+    
+    def reset_figure(self):
+        self.ax.figure.clf()
+        self.ax = self.ax.figure.add_subplot(111)
+        self.twin_ax = self.ax.twinx()
+        self.ax.figure.sca(self.ax)
+        self.colorbar = None
+        self._line = None
+        self.busy = False
+        self.canvas.draw_idle()
+        
+        
     def draw_histogram(self, data):
         if not data.size:
             return

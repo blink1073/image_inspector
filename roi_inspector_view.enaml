@@ -29,7 +29,7 @@ fig1 = plt.figure()
 ax1 = fig1.gca()
 ax1.imshow(data.camera(), interpolation='nearest')
 #ax1.plot(np.random.random(1000))
-tool = ROITool(ax1, shape='line', on_release=print_geometry)
+tool = ROITool(ax1, shape='point', on_release=print_geometry)
     
 
 def get_roi_figure():

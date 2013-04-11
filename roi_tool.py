@@ -31,7 +31,7 @@ class ROITool(CanvasToolBase):
     def roi_force(self, roi):
         '''React to an roi setter'''
         # TODO: implement this
-        if not roi:
+        if roi is None:
             return
         if len(roi) == 4:
             self.shape = 'rectangle'
