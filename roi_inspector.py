@@ -77,17 +77,25 @@ class ROIPlotter(CanvasToolBase):
         self.busy = False
         self.canvas.draw_idle()
         
-        
     def draw_histogram(self, data):
         if not data.size:
             return
         nbins = min(100, np.sqrt(data.size))
         nbins = max(10, nbins)
         self.ax.hist(data, bins=nbins, histtype='stepfilled')
-        self.twin_ax.hist(data, bins=nbins, color='black',
-                                      normed=True, histtype='step',
-                                      cumulative=True)
-        self.twin_ax.get_yaxis().set_visible(True)
+        vals = np.percentile(data, [2, 50, 98])
+        xlim = self.ax.get_xlim()
+        for ind, val in enumerate(vals):
+            if ind in [0, 2]:
+                color = 'red'
+            else:
+                color = 'black'
+            self.ax.axvline(x=val, ymin=0, ymax=1, color=color, linestyle='--')
+        self.ax.set_xlim(xlim)
+        #self.twin_ax.hist(data, bins=nbins, color='black',
+        #                              normed=True, histtype='step',
+        #                              cumulative=True)
+        #self.twin_ax.get_yaxis().set_visible(True)
 
     def draw_line_profile(self, data):
         if not self._line or not self._line in self.ax.lines:
