@@ -48,6 +48,8 @@ class PolygonToolBase(ROIToolBase):
     def data(self):
         path = Path(self.verts)
         source_data = self.source_data
+        if source_data is None:
+            return
         if isinstance(source_data, tuple):
             x, y = source_data
             if x is None:
@@ -63,7 +65,7 @@ class PolygonToolBase(ROIToolBase):
             if np.rank(source_data) == 2:
                 return source_data.ravel()[ind]
             else:
-                data = [source_data[index].ravel()[ind] for index in range(3)]
+                data = [source_data[:, :, index].ravel()[ind] for index in range(3)]
                 return data
 
 
@@ -242,6 +244,8 @@ class RectangleSelection(PolygonToolBase):
                 self.origin = [self.origin[0] + dx, self.origin[1] + dy]
                 self.anchor = event.xdata, event.ydata
         else:
+            if not self.origin:
+                self.start()
             dx = (event.xdata - self.origin[0]) / 2.
             dy = (event.ydata - self.origin[1]) / 2.
             center = np.array(self.origin)

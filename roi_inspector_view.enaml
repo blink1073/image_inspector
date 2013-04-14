@@ -50,7 +50,8 @@ enamldef ROIPanel(Container): roi_panel:
     attr inspector = ROIPlotter(figure.gca())
     event update
     constraints = [vbox(canvas, roi_text), 
-                       canvas.height == roi_text.height * 2]
+                       canvas.height == roi_text.height * 2,
+                       canvas.width == 500]
     initialized ::
         update()
     update ::

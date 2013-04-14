@@ -46,7 +46,7 @@ class PointTool(ROIToolBase):
                  shape_props=None):
         super(PointTool, self).__init__(ax, on_move=on_move, on_enter=on_enter,
                                         on_release=on_release, useblit=useblit)
-        props = dict(edgecolor='r', facecolor='0.7', alpha=0.5, animated=True)
+        props = dict(edgecolor='b', facecolor='w', alpha=0.5, linewidth=2, animated=True)
         props.update(shape_props if shape_props is not None else {})
         self._point = Ellipse((0, 0), 0, 0, **props)
         self._point.set_visible(False)

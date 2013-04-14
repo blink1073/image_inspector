@@ -43,8 +43,8 @@ class LineTool(ROIToolBase):
         self.maxdist = maxdist
         self._active_pt = None
 
-        x = (0, 0, 0)
-        y = (0, 0, 0)
+        x = (0, 0)
+        y = (0, 0)
         self._end_pts = np.transpose([x, y])
 
         self._handles = ToolHandles(ax, x, y)
@@ -183,7 +183,7 @@ class ThickLineTool(LineTool):
                 pass
         self.callback_on_change = on_change
 
-        self.connect_event('scroll_event', self.on_scroll)
+        #self.connect_event('scroll_event', self.on_scroll)
         self.connect_event('key_press_event', self.on_key_press)
 
     def on_scroll(self, event):
@@ -236,6 +236,8 @@ def profile_line(img, end_points, linewidth=1):
     dx, dy = point2 - point1
 
     # Quick calculation if perfectly horizontal or vertical (remove?)
+    img = img.copy()
+    img[np.isnan(img)] = 0
     if x1 == x2:
         pixels = img[min(y1, y2): max(y1, y2) + 1,
                      x1 - linewidth / 2:  x1 + linewidth / 2 + 1]

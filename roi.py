@@ -148,7 +148,10 @@ class ROI(object):
             x, y = self.geometry
             if not self.data is None:
                 text = 'Point: {0:.4G} @ ({1:.4G}, {2:.4G})'
-                text = text.format(self.data[5, 5], x, y)
+                try:
+                    text = text.format(self.data[5, 5], x, y)
+                except (ValueError, IndexError):
+                    pass
             else:
                 text = 'Point: ({0:.4G}, {1:.4G})'.format(x, y)
         else:
@@ -157,7 +160,10 @@ class ROI(object):
 
 
 def compute_stats(data):
-    if data is None or data.size == 1:
+    if data is None:
+        return
+    data = np.array(data)
+    if data.size == 1:
         return
     real_data = data[np.isfinite(data)]
     if not real_data.size:

@@ -56,7 +56,11 @@ class ROIPlotter(CanvasToolBase):
             self.draw_line_profile(roi.data)
         elif roi.shape == 'point' and not roi.data is None:
             self.ax.clear()
-            im = self.ax.imshow(roi.data, interpolation='nearest', picker=True)
+            try:
+                im = self.ax.imshow(roi.data, interpolation='nearest', picker=True)
+            except ValueError:
+                self.busy = False
+                return
             if not self.colorbar:
                 self.colorbar = self.ax.figure.colorbar(im)
             else:
@@ -80,6 +84,7 @@ class ROIPlotter(CanvasToolBase):
     def draw_histogram(self, data):
         if not data.size:
             return
+        data = data[np.isfinite(data)]
         nbins = min(100, np.sqrt(data.size))
         nbins = max(10, nbins)
         self.ax.hist(data, bins=nbins, histtype='stepfilled')
@@ -92,6 +97,7 @@ class ROIPlotter(CanvasToolBase):
                 color = 'black'
             self.ax.axvline(x=val, ymin=0, ymax=1, color=color, linestyle='--')
         self.ax.set_xlim(xlim)
+        
         #self.twin_ax.hist(data, bins=nbins, color='black',
         #                              normed=True, histtype='step',
         #                              cumulative=True)
