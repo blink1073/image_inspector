@@ -78,7 +78,7 @@ class ROIToolBase(CanvasToolBase):
             source_type = 'image'
         else:
             source_type = 'xy'
-        return ROI(self.shape, self.data, self.geometry,
+        return ROI(self.ax, self.shape, self.data, self.geometry,
                    source_type=source_type)
 
     def publish_roi(self):
@@ -92,7 +92,8 @@ class ROIToolBase(CanvasToolBase):
 
 class ROI(object):
 
-    def __init__(self, shape, data, geometry, source_type):
+    def __init__(self, ax, shape, data, geometry, source_type):
+        self.ax = ax
         self.shape = shape.lower()
         self.geometry = geometry
         self.data = data
