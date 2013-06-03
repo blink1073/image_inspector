@@ -89,7 +89,6 @@ class CanvasToolBase(object):
     def connect_custom_event(self, event, callback):
         """Connect callback with an event that is not canvas specific.
         """
-        print 'custom connect', event
         cid = callback_registry.connect(event, callback)
         self.custom_cids.append(cid)
             

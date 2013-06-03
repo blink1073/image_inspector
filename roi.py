@@ -108,20 +108,20 @@ class ROI(object):
     def _get_stat_text(self):
         text = str(self) + '\n'
         text += '-' * 42 + '\n'
-        if not self.shape == 'point':
-            if isinstance(self.data, tuple):
-                # TODO: handle color data
-                pass
-            left_col = ['mean', 'std', 'min', 'max', 'sum', 'size']
-            right_col = ['median', 'ptp', '25%', '75%', '%val', '%sat']
-            for (left, right) in zip(left_col, right_col):
-                try:
-                    left_stat = float(self.stats[left])
-                    right_stat = float(self.stats[right])
-                except Exception:
-                    return
-                line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
-                text += line.format(left, left_stat, right, right_stat)
+        if isinstance(self.data, tuple):
+            # TODO: handle color data
+            pass
+        left_col = ['mean', 'std', 'min', 'max', 'sum', 'size']
+        right_col = ['median', 'ptp', '25%', '75%', '%val', '%sat']
+        for (left, right) in zip(left_col, right_col):
+            try:
+                left_stat = float(self.stats[left])
+                right_stat = float(self.stats[right])
+            except Exception:
+                return
+            line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
+            text += line.format(left, left_stat, right, right_stat)
+
         return text
         
     def __getstate__(self):
@@ -186,7 +186,7 @@ def compute_stats(data):
     results['median'] = percentiles[2]
     results['75%'] = percentiles[3]
     results['ptp'] = percentiles[-1] - percentiles[0]
-    results['%val'] = int(float(data.size) / real_data.size * 100)
+    results['%val'] = int(real_data.size / float(data.size) * 100)
     saturated = data[data == results['max']].size
     results['%sat'] = int(float(saturated) / data.size * 100)
     return results

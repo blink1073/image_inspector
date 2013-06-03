@@ -82,21 +82,23 @@ class ROIPlotter(CanvasToolBase):
         self.canvas.draw_idle()
         
     def draw_histogram(self, data):
-        if not data.size:
+        if data is None or not data.size:
             return
         data = data[np.isfinite(data)]
         nbins = min(100, np.sqrt(data.size))
         nbins = max(10, nbins)
-        self.ax.hist(data, bins=nbins, histtype='stepfilled')
-        vals = np.percentile(data, [2, 50, 98])
-        xlim = self.ax.get_xlim()
+        try:
+            self.ax.hist(data, bins=nbins, histtype='stepfilled')
+        except ValueError:
+            return
+        vals = np.percentile(data, [2, 25, 50, 75, 98])
         for ind, val in enumerate(vals):
-            if ind in [0, 2]:
+            if ind in [0, 4]:
                 color = 'red'
-            else:
+            elif ind in [1, 3]:
                 color = 'black'
             self.ax.axvline(x=val, ymin=0, ymax=1, color=color, linestyle='--')
-        self.ax.set_xlim(xlim)
+        self.ax.set_xlim((vals[0], vals[-1]))
         
         #self.twin_ax.hist(data, bins=nbins, color='black',
         #                              normed=True, histtype='step',

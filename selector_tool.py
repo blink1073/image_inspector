@@ -146,6 +146,8 @@ class SelectionTool(CanvasToolBase):
     @property
     def geometry(self):
         return self.tool.verts
+    def publish_roi(self):
+        self.tool.publish_roi()
 
     def activate(self):
         self.modifiers = set()
@@ -160,6 +162,13 @@ class SelectionTool(CanvasToolBase):
         self.modifiers = set()
         self.verts = None
         self.redraw()
+
+    def finalize(self):
+        self.tool.finalize()
+        
+    @property
+    def _prev_line(self):
+        return self.tool._prev_line
 
 
 if __name__ == '__main__':

@@ -39,7 +39,8 @@ class ROITool(CanvasToolBase):
         elif len(roi) == 2:
             self.shape = 'point'
             self._active_tool.geometry = roi
-            
+        self._active_tool._prev_line.set_visible(False)
+        self.publish_roi()    
             
     def _on_key_press(self, event):
         if event.key == 'ctrl+p':
@@ -75,6 +76,8 @@ class ROITool(CanvasToolBase):
     @property
     def geometry(self):
         return self._active_tool.geometry
+    def publish_roi(self):
+        self._active_tool.publish_roi()
 
 
 class SelectFromCollection(object):

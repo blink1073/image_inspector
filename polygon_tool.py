@@ -46,6 +46,8 @@ class PolygonToolBase(ROIToolBase):
 
     @property
     def data(self):
+        if not np.array(self.verts).size:
+            return None
         path = Path(self.verts)
         source_data = self.source_data
         if source_data is None:
@@ -314,7 +316,7 @@ class RectangleSelection(PolygonToolBase):
     def _rect_bbox(self):
         if not len(self.extents):
             return 0, 0, 0, 0
-        x1, x2, y1, y2 = self.extents.tolist()
+        x1, x2, y1, y2 = np.array(self.extents).tolist()
         x0, x1 = np.sort((x1, x2))
         y0, y1 = np.sort((y1, y2))
         width = x1 - x0
