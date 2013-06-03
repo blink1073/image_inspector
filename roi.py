@@ -123,6 +123,14 @@ class ROI(object):
                 line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
                 text += line.format(left, left_stat, right, right_stat)
         return text
+        
+    def __getstate__(self):
+        state = dict()
+        state['geometry'] = np.array(self.geometry)
+        state['data'] = np.array(self.data)
+        state.update(self.stats)
+        state['shape'] = self.shape
+        return state
 
     def __str__(self):
         if self.shape in ['rectangle', 'ellipse']:

@@ -112,7 +112,11 @@ class ROIPlotter(CanvasToolBase):
             self._line.set_ydata(data)
         self.ax.relim()
         if self.useblit:
-            self.ax.draw_artist(self._line)
+            self.canvas.restore_region(self.img_background)
+            try:
+                self.ax.draw_artist(self._line)
+            except AssertionError:
+                self._blit_on_draw_event()
         self.ax.autoscale_view(tight=True)
         self.canvas.draw_idle()
 

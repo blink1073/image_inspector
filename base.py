@@ -110,11 +110,11 @@ class CanvasToolBase(object):
             artist.set_visible(val)
 
     def _blit_on_draw_event(self, event=None):
-        self.img_background = self.canvas.copy_from_bbox(self.ax.bbox)
         if event and self.ignore(event):
             return
         if not event:
             return
+        self.img_background = self.canvas.copy_from_bbox(self.ax.bbox)
         self._draw_artists()
 
     def _draw_artists(self):
