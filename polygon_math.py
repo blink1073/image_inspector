@@ -6,7 +6,7 @@ Created on Fri Mar  8 14:45:34 2013
 """
 
 import numpy as np
-from matplotlib.nxutils import points_inside_poly
+from matplotlib.path import Path
 
 
 def sort_poly_verts(verts):
@@ -96,7 +96,8 @@ def segments_in_polygon(segments, poly_verts):
     pt1 = segments[:, 0]
     pt2 = segments[:, 1]
     centroid = (pt1 + pt2) / 2.
-    return points_inside_poly(centroid, poly_verts)
+    p = Path(centroid)
+    return p.contains_points(poly_verts)
 
 
 def gather_segments(poly_verts):
