@@ -76,8 +76,15 @@ class ROITool(CanvasToolBase):
     @property
     def geometry(self):
         return self._active_tool.geometry
+        
     def publish_roi(self):
         self._active_tool.publish_roi()
+        
+    def redraw(self, redraw_images=False):
+        self._active_tool.redraw()
+        
+    def _blit_on_draw_event(self, event=None):
+        self._active_tool._blit_on_draw_event(event)
 
 
 class SelectFromCollection(object):
