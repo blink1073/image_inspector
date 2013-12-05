@@ -42,6 +42,7 @@ class CanvasToolBase(object):
         self.ax = ax
         self.canvas = ax.figure.canvas
         self.img_background = None
+        self.img_data = None
         self.canvas_cids = []
         self.custom_cids = []
         self._artists = []
@@ -117,6 +118,10 @@ class CanvasToolBase(object):
         self._draw_artists()
 
     def _draw_artists(self):
+        if hasattr(self.ax, 'data_changed') and self.ax.data_changed:
+            for image in self.ax.images:
+                self.ax.draw_artist(image)
+            self.ax.data_changed = True
         for artist in self._artists:
             self.ax.draw_artist(artist)
 
@@ -139,7 +144,7 @@ class CanvasToolBase(object):
             self.canvas.restore_region(self.img_background)
             self._draw_artists()
             self.canvas.blit(self.ax.bbox)
-        else:
+        elif self._artists:
             self.canvas.draw_idle()
 
     def _on_key_press(self, event):
