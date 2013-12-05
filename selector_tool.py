@@ -146,6 +146,7 @@ class SelectionTool(CanvasToolBase):
     @property
     def geometry(self):
         return self.tool.verts
+        
     def publish_roi(self):
         self.tool.publish_roi()
 
@@ -169,6 +170,16 @@ class SelectionTool(CanvasToolBase):
     @property
     def _prev_line(self):
         return self.tool._prev_line
+        
+    def redraw(self):
+        if not hasattr(self, 'tool'):
+            return
+        self.tool.redraw()
+        
+    def _blit_on_draw_event(self, event):
+        if not hasattr(self, 'tool'):
+            return
+        self.tool._blit_on_draw_event(event)
 
 
 if __name__ == '__main__':
