@@ -138,6 +138,8 @@ class ROI(object):
             text = '{0}: ({1:.4G}, {2:.4G}), {3:.4G}, {4:.4G}'
             text = text.format(self.shape.capitalize(), x, y, wid, hgt)
         elif self.shape == 'lasso':
+            if not self.geometry:
+                return ''
             path = Path(self.geometry)
             extents = path.get_extents()
             x, y = extents.p0
