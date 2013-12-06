@@ -65,7 +65,6 @@ class SelectionTool(CanvasToolBase):
         self.tools = [LassoSelection(ax),
                       RectangleSelection(ax, maxdist=maxdist),
                         EllipseSelection(ax, maxdist=maxdist)]
-
         self.shape = shape
 
     def onkey(self, event):
@@ -146,7 +145,7 @@ class SelectionTool(CanvasToolBase):
     @property
     def geometry(self):
         return self.tool.verts
-        
+
     def publish_roi(self):
         self.tool.publish_roi()
 
@@ -166,16 +165,16 @@ class SelectionTool(CanvasToolBase):
 
     def finalize(self):
         self.tool.finalize()
-        
+
     @property
     def _prev_line(self):
         return self.tool._prev_line
-        
+
     def redraw(self):
         if not hasattr(self, 'tool'):
             return
         self.tool.redraw()
-        
+
     def _blit_on_draw_event(self, event):
         if not hasattr(self, 'tool'):
             return
