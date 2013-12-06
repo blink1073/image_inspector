@@ -38,6 +38,19 @@ class ROIToolBase(CanvasToolBase):
             self._prev_line.set_data(zip(*self.verts))
             self._prev_line.set_visible(False)
         self.update()
+        self.callback_on_release(self.geometry)
+
+    def ignore(self, event):
+        """Return True if event should be ignored.
+
+        This method (or a version of it) should be called at the beginning
+        of any event callback.
+        """
+        if self.canvas.toolbar and self.canvas.toolbar.mode:
+            return True
+        if hasattr(event, 'button') and event.button == 3:
+            return True
+        return not self.active
 
     @property
     def source_data(self):
@@ -47,8 +60,11 @@ class ROIToolBase(CanvasToolBase):
             xy = self.ax.collections[0].get_offsets()
             return xy[:, 0], xy[:, 1]
         elif self.ax.lines:
-            x, y = self.ax.lines[0].get_data()
-            return x, y
+            for line in self.ax.lines:
+                x, y = line.get_data()
+                if isinstance(x, np.ndarray) and x.size > 4:
+                    return x, y
+            return None, None
 
     def update(self):
         if not self.verts:
@@ -63,12 +79,12 @@ class ROIToolBase(CanvasToolBase):
             source_type = 'image'
         else:
             source_type = 'xy'
-        return ROI(self.shape, self.data, self.geometry,
+        return ROI(self.ax, self.shape, self.data, self.geometry,
                    source_type=source_type)
 
     def publish_roi(self):
         if not self.geometry is None:
-            self.canvas.callbacks.process('roi_changed', self.roi)
+            self.process_custom_event('roi_changed', self.roi)
 
     @property
     def data(self):
@@ -77,7 +93,8 @@ class ROIToolBase(CanvasToolBase):
 
 class ROI(object):
 
-    def __init__(self, shape, data, geometry, source_type):
+    def __init__(self, ax, shape, data, geometry, source_type):
+        self.ax = ax
         self.shape = shape.lower()
         self.geometry = geometry
         self.data = data
@@ -92,21 +109,29 @@ class ROI(object):
     def _get_stat_text(self):
         text = str(self) + '\n'
         text += '-' * 42 + '\n'
-        if not self.shape == 'point':
-            if isinstance(self.data, tuple):
-                # TODO: handle color data
-                pass
-            left_col = ['mean', 'std', 'min', 'max', 'sum', 'size']
-            right_col = ['median', 'ptp', '25%', '75%', '%val', '%sat']
-            for (left, right) in zip(left_col, right_col):
-                try:
-                    left_stat = float(self.stats[left])
-                    right_stat = float(self.stats[right])
-                except Exception:
-                    return
-                line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
-                text += line.format(left, left_stat, right, right_stat)
+        if isinstance(self.data, tuple):
+            # TODO: handle color data
+            pass
+        left_col = ['mean', 'std', 'min', 'max', 'sum', 'size']
+        right_col = ['median', 'ptp', '25%', '75%', '%val', '%sat']
+        for (left, right) in zip(left_col, right_col):
+            try:
+                left_stat = float(self.stats[left])
+                right_stat = float(self.stats[right])
+            except Exception:
+                return
+            line = '{0:>6} | {1:>8.3G}   || {2:>6} | {3:>8.3G}\n'
+            text += line.format(left, left_stat, right, right_stat)
+
         return text
+
+    def __getstate__(self):
+        state = dict()
+        state['geometry'] = np.array(self.geometry)
+        state['data'] = np.array(self.data)
+        state.update(self.stats)
+        state['shape'] = self.shape
+        return state
 
     def __str__(self):
         if self.shape in ['rectangle', 'ellipse']:
@@ -114,6 +139,8 @@ class ROI(object):
             text = '{0}: ({1:.4G}, {2:.4G}), {3:.4G}, {4:.4G}'
             text = text.format(self.shape.capitalize(), x, y, wid, hgt)
         elif self.shape == 'lasso':
+            if not self.geometry:
+                return ''
             path = Path(self.geometry)
             extents = path.get_extents()
             x, y = extents.p0
@@ -131,9 +158,12 @@ class ROI(object):
             text = text.format(dist, int(angle), p1[0], p1[1])
         elif self.shape == 'point':
             x, y = self.geometry
-            if self.data:
+            if not self.data is None:
                 text = 'Point: {0:.4G} @ ({1:.4G}, {2:.4G})'
-                text = text.format(self.data, x, y)
+                try:
+                    text = text.format(self.data[5, 5], x, y)
+                except (ValueError, IndexError):
+                    pass
             else:
                 text = 'Point: ({0:.4G}, {1:.4G})'.format(x, y)
         else:
@@ -142,7 +172,10 @@ class ROI(object):
 
 
 def compute_stats(data):
-    if data is None or data.size == 1:
+    if data is None:
+        return
+    data = np.array(data)
+    if data.size == 1:
         return
     real_data = data[np.isfinite(data)]
     if not real_data.size:
@@ -156,7 +189,7 @@ def compute_stats(data):
     results['median'] = percentiles[2]
     results['75%'] = percentiles[3]
     results['ptp'] = percentiles[-1] - percentiles[0]
-    results['%val'] = int(float(data.size) / real_data.size * 100)
+    results['%val'] = int(real_data.size / float(data.size) * 100)
     saturated = data[data == results['max']].size
     results['%sat'] = int(float(saturated) / data.size * 100)
     return results

@@ -46,11 +46,15 @@ class PolygonToolBase(ROIToolBase):
 
     @property
     def data(self):
+        if not np.array(self.verts).size:
+            return None
         path = Path(self.verts)
         source_data = self.source_data
+        if source_data is None:
+            return
         if isinstance(source_data, tuple):
             x, y = source_data
-            if not x:
+            if x is None:
                 return
             pts = np.vstack((x, y)).T
             ind = np.nonzero(path.contains_points(pts))[0]
@@ -63,7 +67,7 @@ class PolygonToolBase(ROIToolBase):
             if np.rank(source_data) == 2:
                 return source_data.ravel()[ind]
             else:
-                data = [source_data[index].ravel()[ind] for index in range(3)]
+                data = [source_data[:, :, index].ravel()[ind] for index in range(3)]
                 return data
 
 
@@ -242,6 +246,8 @@ class RectangleSelection(PolygonToolBase):
                 self.origin = [self.origin[0] + dx, self.origin[1] + dy]
                 self.anchor = event.xdata, event.ydata
         else:
+            if not self.origin:
+                self.start()
             dx = (event.xdata - self.origin[0]) / 2.
             dy = (event.ydata - self.origin[1]) / 2.
             center = np.array(self.origin)
@@ -249,10 +255,12 @@ class RectangleSelection(PolygonToolBase):
                 # square command
                 dx_pix = abs(event.x - self.origin_pix[0])
                 dy_pix = abs(event.y - self.origin_pix[1])
+                if not dx_pix:
+                    return
                 maxd = max(abs(dx_pix), abs(dy_pix))
                 if abs(dx_pix) < maxd:
                     dx *= maxd / abs(dx_pix)
-                if abs(dy_pix) < max:
+                if abs(dy_pix) < maxd:
                     dy *= maxd / abs(dy_pix)
             if 'control' in self.modifiers or 'ctrl+shift' in self.modifiers:
                 # from center
@@ -308,7 +316,7 @@ class RectangleSelection(PolygonToolBase):
     def _rect_bbox(self):
         if not len(self.extents):
             return 0, 0, 0, 0
-        x1, x2, y1, y2 = self.extents.tolist()
+        x1, x2, y1, y2 = np.array(self.extents).tolist()
         x0, x1 = np.sort((x1, x2))
         y0, y1 = np.sort((y1, y2))
         width = x1 - x0

@@ -1,5 +1,6 @@
 import numpy as np
-
+import matplotlib
+matplotlib.use('Qt4Agg', False)
 try:
     from matplotlib import lines
 except ImportError:
@@ -11,6 +12,11 @@ __all__ = ['CanvasToolBase', 'ToolHandles']
 
 def _pass(*args):
     pass
+
+from matplotlib.cbook import CallbackRegistry
+
+
+callback_registry = CallbackRegistry()
 
 
 class CanvasToolBase(object):
@@ -36,7 +42,9 @@ class CanvasToolBase(object):
         self.ax = ax
         self.canvas = ax.figure.canvas
         self.img_background = None
-        self.cids = []
+        self.img_data = None
+        self.canvas_cids = []
+        self.custom_cids = []
         self._artists = []
 
         if useblit:
@@ -70,12 +78,24 @@ class CanvasToolBase(object):
         function stores call back ids for later clean up.
         """
         cid = self.canvas.mpl_connect(event, callback)
-        self.cids.append(cid)
+        self.canvas_cids.append(cid)
 
     def disconnect_events(self):
         """Disconnect all events created by this widget."""
-        for c in self.cids:
+        for c in self.canvas_cids:
             self.canvas.mpl_disconnect(c)
+        for c in self.canvas_cids:
+            callback_registry.disconnect(c)
+
+    def connect_custom_event(self, event, callback):
+        """Connect callback with an event that is not canvas specific.
+        """
+        cid = callback_registry.connect(event, callback)
+        self.custom_cids.append(cid)
+
+    def process_custom_event(self, event, *args, **kwargs):
+        '''Process a custom event'''
+        callback_registry.process(event, *args, **kwargs)
 
     def ignore(self, event):
         """Return True if event should be ignored.
@@ -92,10 +112,16 @@ class CanvasToolBase(object):
     def _blit_on_draw_event(self, event=None):
         if event and self.ignore(event):
             return
+        if not event:
+            return
         self.img_background = self.canvas.copy_from_bbox(self.ax.bbox)
         self._draw_artists()
 
     def _draw_artists(self):
+        if hasattr(self.ax, 'data_changed') and self.ax.data_changed:
+            for image in self.ax.images:
+                self.ax.draw_artist(image)
+            self.ax.data_changed = True
         for artist in self._artists:
             self.ax.draw_artist(artist)
 
@@ -118,7 +144,7 @@ class CanvasToolBase(object):
             self.canvas.restore_region(self.img_background)
             self._draw_artists()
             self.canvas.blit(self.ax.bbox)
-        else:
+        elif self._artists:
             self.canvas.draw_idle()
 
     def _on_key_press(self, event):
@@ -138,7 +164,7 @@ class CanvasToolBase(object):
         if not self.ignore(event):
             self.on_mouse_release(event)
             if not self._busy:
-                self.callback_on_release
+                self.callback_on_release(self.geometry)
 
     def on_mouse_release(self, event):
         pass
@@ -154,7 +180,7 @@ class CanvasToolBase(object):
     @property
     def geometry(self):
         """Geometry information that gets passed to callback functions."""
-        raise NotImplementedError
+        return []
 
 
 class ToolHandles(object):
