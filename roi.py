@@ -38,7 +38,8 @@ class ROIToolBase(CanvasToolBase):
             self._prev_line.set_data(zip(*self.verts))
             self._prev_line.set_visible(False)
         self.update()
-        
+        self.callback_on_release(self.geometry)
+
     def ignore(self, event):
         """Return True if event should be ignored.
 
@@ -123,7 +124,7 @@ class ROI(object):
             text += line.format(left, left_stat, right, right_stat)
 
         return text
-        
+
     def __getstate__(self):
         state = dict()
         state['geometry'] = np.array(self.geometry)
