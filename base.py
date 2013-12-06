@@ -85,14 +85,14 @@ class CanvasToolBase(object):
         for c in self.canvas_cids:
             self.canvas.mpl_disconnect(c)
         for c in self.canvas_cids:
-            callback_registry.disconnect(c)   
-            
+            callback_registry.disconnect(c)
+
     def connect_custom_event(self, event, callback):
         """Connect callback with an event that is not canvas specific.
         """
         cid = callback_registry.connect(event, callback)
         self.custom_cids.append(cid)
-            
+
     def process_custom_event(self, event, *args, **kwargs):
         '''Process a custom event'''
         callback_registry.process(event, *args, **kwargs)
@@ -164,7 +164,7 @@ class CanvasToolBase(object):
         if not self.ignore(event):
             self.on_mouse_release(event)
             if not self._busy:
-                self.callback_on_release
+                self.callback_on_release(self.geometry)
 
     def on_mouse_release(self, event):
         pass
@@ -180,7 +180,7 @@ class CanvasToolBase(object):
     @property
     def geometry(self):
         """Geometry information that gets passed to callback functions."""
-        raise NotImplementedError
+        return []
 
 
 class ToolHandles(object):
