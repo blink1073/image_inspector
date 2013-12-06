@@ -70,7 +70,7 @@ class ROIPlotter(CanvasToolBase):
         self.stat_text = roi.stat_text
         self.data = roi.data
         self.busy = False
-    
+
     def reset_figure(self):
         self.ax.figure.clf()
         self.ax = self.ax.figure.add_subplot(111)
@@ -80,9 +80,10 @@ class ROIPlotter(CanvasToolBase):
         self._line = None
         self.busy = False
         self.canvas.draw_idle()
-        
+
     def draw_histogram(self, data):
-        if data is None or not data.size:
+        data = np.array(data)
+        if data.size < 2:
             return
         data = data[np.isfinite(data)]
         nbins = min(100, np.sqrt(data.size))
@@ -99,11 +100,11 @@ class ROIPlotter(CanvasToolBase):
                 color = 'black'
             self.ax.axvline(x=val, ymin=0, ymax=1, color=color, linestyle='--')
         self.ax.set_xlim((vals[0], vals[-1]))
-        
-        #self.twin_ax.hist(data, bins=nbins, color='black',
-        #                              normed=True, histtype='step',
-        #                              cumulative=True)
-        #self.twin_ax.get_yaxis().set_visible(True)
+
+        self.twin_ax.hist(data, bins=nbins, color='black',
+                                      normed=True, histtype='step',
+                                      cumulative=True)
+        self.twin_ax.get_yaxis().set_visible(True)
 
     def draw_line_profile(self, data):
         if not self._line or not self._line in self.ax.lines:
@@ -126,6 +127,7 @@ class ROIPlotter(CanvasToolBase):
 if __name__ == '__main__':
     np.testing.rundocs()
     import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
     from skimage import data
     from roi_tool import ROITool
 
@@ -135,12 +137,16 @@ if __name__ == '__main__':
         print geometry
 
     def roi_changed(roi):
-        print roi.shape, len(roi.geometry), type(roi.data)
+        print roi.stat_text
 
-    f, axes = plt.subplots(2)
-    axes[0].imshow(image, interpolation='nearest')
+    f = plt.figure()
+    grid = gridspec.GridSpec(2, 1, height_ratios=[2,1])
+    ax0, ax1 = plt.subplot(grid[0]), plt.subplot(grid[1])
+
+    ax0.imshow(image, interpolation='nearest', cmap='gray')
     #axes[0].plot(np.random.random(1000))
-    tool = ROITool(axes[0], shape='line', on_release=print_geometry)
-    inspector = ROIPlotter(axes[1])
+    tool = ROITool(ax0, shape='rectangle', on_release=print_geometry)
+    inspector = ROIPlotter(ax1)
+    inspector.connect_custom_event('roi_changed', roi_changed)
 
     plt.show()
