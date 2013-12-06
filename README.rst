@@ -1,6 +1,7 @@
+image_inspector
+===============
 
-
-Custom Drawing tool for Matplotlib (based on GIMP drawing tools):
+Brings GIMP-like selection tools to Matplotlib, plus an ROI inspector tool
 
 Supports:
     Rectangle, Ellipse, Free Lasso and Polygon Lasso, Line and Point Modes
