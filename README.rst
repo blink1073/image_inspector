@@ -47,3 +47,11 @@ Advanced Operations
     + Hold CTRL and create a new shape for an INTERSECTION
     + Hold SHIFT+CTRL and create a new shape for a SUBTRACTION
     + You can switch between Rectangle, Ellipse, and Lasso at any time
+    
+    
+Demo
+----
+
+For a demo, run::
+    
+    $ python roi_inspector.py
