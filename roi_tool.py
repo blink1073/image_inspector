@@ -20,14 +20,14 @@ class ROITool(CanvasToolBase):
                  useblit=True):
         CanvasToolBase.__init__(self, ax, on_move=on_move, on_enter=on_enter,
                             on_release=on_release, useblit=useblit)
-        self.selector = SelectionTool(ax, on_release=on_release,
+        self.selector = SelectionTool(ax, on_release=self.callback_on_release,
                                       shape='rectangle')
-        self.line = ThickLineTool(ax, on_release=on_release)
-        self.point = PointTool(ax, on_release=on_release)
+        self.line = ThickLineTool(ax, on_release=self.callback_on_release)
+        self.point = PointTool(ax, on_release=self.callback_on_release)
         self.tools = [self.line, self.point, self.selector]
         self.shape = shape
         self.connect_event('roi_force', self.roi_force)
-        
+
     def roi_force(self, roi):
         '''React to an roi setter'''
         # TODO: implement this
@@ -40,8 +40,8 @@ class ROITool(CanvasToolBase):
             self.shape = 'point'
             self._active_tool.geometry = roi
         self._active_tool._prev_line.set_visible(False)
-        self.publish_roi()    
-            
+        self.publish_roi()
+
     def _on_key_press(self, event):
         if event.key == 'ctrl+p':
             self.activate_tool(self.point)
@@ -76,13 +76,13 @@ class ROITool(CanvasToolBase):
     @property
     def geometry(self):
         return self._active_tool.geometry
-        
+
     def publish_roi(self):
         self._active_tool.publish_roi()
-        
+
     def redraw(self, redraw_images=False):
         self._active_tool.redraw()
-        
+
     def _blit_on_draw_event(self, event=None):
         self._active_tool._blit_on_draw_event(event)
 
