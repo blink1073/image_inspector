@@ -59,7 +59,7 @@ enamldef ROIPanel(Container): roi_panel:
         text = roi_panel.inspector.stat_text
         if text:
             roi_text.text = text
-        timed_call(100, update)
+        timed_call(1000, update)
     MPLCanvas: canvas:
         figure = roi_panel.figure
     MultilineField: roi_text:
