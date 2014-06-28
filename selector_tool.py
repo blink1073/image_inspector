@@ -158,6 +158,8 @@ class SelectionTool(CanvasToolBase):
     def deactivate(self):
         for tool in self.tools:
             tool.deactivate()
+        self.tool._prev_line.set_data([], [])
+        self.tool._prev_line.set_visible(False)
         self.set_visible(False)
         self.modifiers = set()
         self.verts = None
