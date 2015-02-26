@@ -151,7 +151,7 @@ if __name__ == '__main__':
     data = np.random.rand(100, 2)
 
     def roi_changed(roi):
-        print roi.shape, len(roi.geometry), type(roi.data)
+        print(roi.shape, len(roi.geometry), type(roi.data))
 
     subplot_kw = dict(xlim=(0, 1), ylim=(0, 1), autoscale_on=False)
     fig, ax = plt.subplots(subplot_kw=subplot_kw)

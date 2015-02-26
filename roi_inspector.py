@@ -135,10 +135,10 @@ if __name__ == '__main__':
     image = data.camera()
 
     def print_geometry(geometry):
-        print geometry
+        print(geometry)
 
     def roi_changed(roi):
-        print roi.stat_text
+        print(roi.stat_text)
 
     f = plt.figure()
     grid = gridspec.GridSpec(2, 1, height_ratios=[2,1])

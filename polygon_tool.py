@@ -419,7 +419,7 @@ if __name__ == '__main__':
     h, w = image.shape
 
     def roi_changed(roi):
-        print roi.stat_text
+        print(roi.stat_text)
 
     tool = RectangleSelection(ax)
     tool.connect_event('roi_changed', roi_changed)

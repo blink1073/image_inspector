@@ -127,7 +127,7 @@ if __name__ == '__main__':
     image = data.camera()
 
     def print_geometry(geometry):
-        print geometry
+        print(geometry)
 
     f, ax = plt.subplots()
     ax.imshow(image, interpolation='nearest')

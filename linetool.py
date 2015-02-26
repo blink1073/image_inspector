@@ -54,7 +54,7 @@ class LineTool(ROIToolBase):
         if on_enter is None:
             def on_enter(pts):
                 x, y = np.transpose(pts)
-                print "length = %0.2f" % np.sqrt(np.diff(x)**2 + np.diff(y)**2)
+                print("length = %0.2f" % np.sqrt(np.diff(x)**2 + np.diff(y)**2))
         self.callback_on_enter = on_enter
 
     @property
@@ -279,7 +279,7 @@ if __name__ == '__main__':
     h, w = image.shape
 
     def roi_changed(roi):
-        print roi.shape, roi.geometry, roi.data.shape
+        print(roi.shape, roi.geometry, roi.data.shape)
 
     # line_tool = LineTool(ax)
     line_tool = ThickLineTool(ax)
