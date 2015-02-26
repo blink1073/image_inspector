@@ -4,7 +4,7 @@ Created on Sat Apr 06 14:59:45 2013
 
 @author: User
 """
-import enaml.qt.qt
+import enaml.qt
 from enaml.widgets.api import *
 from enaml.layout.api import *
 from enaml.application import timed_call
@@ -19,31 +19,24 @@ from roi_inspector import ROIPlotter
 
 
 def print_geometry(geometry):
-    print geometry
+    print(geometry)
 
 def roi_changed(roi):
-    print roi.shape, len(roi.geometry), type(roi.data)
+    print(roi.shape, len(roi.geometry), type(roi.data))
 
 
 fig1 = plt.figure()
 ax1 = fig1.gca()
 ax1.imshow(data.camera(), interpolation='nearest')
 #ax1.plot(np.random.random(1000))
-tool = ROITool(ax1, shape='point', on_release=print_geometry)
+tool = ROITool(ax1, shape='rectangle', on_release=print_geometry)
     
 
 def get_roi_figure():
     fig = plt.figure()
     fig.set_tight_layout(True)
     return fig
-    
-    
-enamldef ROIDock(DockPane): roi_dock:
-    title = 'ROI Inspector'
-    dock_area = 'right'
-    ROIPanel: roi_panel:
-        pass
-        
+
 
 enamldef ROIPanel(Container): roi_panel:
     attr figure = get_roi_figure()
@@ -63,11 +56,18 @@ enamldef ROIPanel(Container): roi_panel:
     MPLCanvas: canvas:
         figure = roi_panel.figure
     MultilineField: roi_text:
-        font = 'mono 11'
+        font = '11pt mono'
 
+
+enamldef ROIDock(DockPane): roi_dock:
+    title = 'ROI Inspector'
+    dock_area = 'right'
+    ROIPanel: roi_panel:
+        pass
 
 
 enamldef Main(MainWindow):
+    title = 'ROI Inspector'
     Container:
         constraints = [hbox(canvas, roi_panel)]
         MPLCanvas: canvas:
