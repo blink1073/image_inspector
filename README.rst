@@ -55,3 +55,8 @@ Demo
 For a demo, run::
     
     $ python roi_inspector.py
+
+If you have enaml >= 0.8, you can run::
+  
+    $ enaml-run roi_inspector_view.enaml
+
