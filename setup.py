@@ -1,6 +1,6 @@
 """Setup script for image_inspector package.
 """
-DISTNAME = 'image_inspector'
+DISTNAME = 'iminspector'
 DESCRIPTION = 'Image Interaction widgets and viewer.'
 LONG_DESCRIPTION = open('README.rst', 'rb').read().decode('utf-8')
 MAINTAINER = 'Steven Silvester'
@@ -26,7 +26,7 @@ except ImportError:
     from distutils.core import setup
 
 
-with open('image_inspector/__init__.py', 'rb') as fid:
+with open('iminspector/__init__.py', 'rb') as fid:
     for line in fid:
         line = line.decode('utf-8')
         if line.startswith('__version__'):
